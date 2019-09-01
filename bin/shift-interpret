@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+
+const { interpret } = require('..');
+
+const file = process.argv[2];
+
+const { readFileSync } = require('fs');
+
+const contents = readFileSync(file, 'utf8');
+
+console.log(interpret(contents, this));

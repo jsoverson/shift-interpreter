@@ -9,7 +9,14 @@ export class InterpreterFunction {
     this.fn = fn;
     this.interpreter = interpreter;
   }
-  execute() {
+  execute(args: any[]) {
+    this.fn.params.items.forEach((param, i) => {
+      if (param.type === 'BindingIdentifier') {
+        this.interpreter.updateVariableValue(param, args[i]);
+      } else {
+        this.interpreter.skipOrThrow(`Param type ${param.type}`);
+      }
+    });
     return this.interpreter.evaluateBlock(this.fn.body);
   }
 }

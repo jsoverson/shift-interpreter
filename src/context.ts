@@ -1,6 +1,4 @@
+export interface InterpreterContext {
+  [key: string]: any;
+};
 
-export class InterpreterContext {
-  constructor() {
-    
-  }
-}

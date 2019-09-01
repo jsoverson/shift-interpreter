@@ -1,18 +1,7 @@
-import {
-  BindingIdentifier,
-  Expression,
-  IdentifierExpression,
-  Script,
-  Statement,
-  VariableDeclaration,
-  AssignmentTargetIdentifier,
-  Block,
-  FunctionBody,
-  FunctionDeclaration
-} from "shift-ast";
+import { AssignmentTargetIdentifier, BindingIdentifier, Block, Expression, FunctionBody, FunctionDeclaration, IdentifierExpression, Script, Statement, VariableDeclaration } from "shift-ast";
 import shiftScope, { ScopeLookup } from "shift-scope";
-import { InterpreterContext } from "./context";
 import { InterpreterFunction } from "./intermediate-types";
+import { InterpreterContext } from "./context";
 
 export class InterpreterRuntimeError extends Error {}
 
@@ -70,7 +59,7 @@ export class Interpreter {
   private variableMap = new Map();
   private options: Options;
 
-  constructor(context: InterpreterContext = new InterpreterContext(), options: Options = {}) {
+  constructor(context: InterpreterContext = {}, options: Options = {}) {
     this.context = context;
     this.options = options;
   }
@@ -90,7 +79,7 @@ export class Interpreter {
     }
     return rv;
   }
-  evaluateStatement(stmt: Statement) {
+  evaluateStatement(stmt: Statement): any {
     if (!this.context) return;
     switch (stmt.type) {
       case "ReturnStatement": 
@@ -100,6 +89,14 @@ export class Interpreter {
         return this.declareVariables(stmt.declaration);
       case "FunctionDeclaration":
         return this.declareFunction(stmt)
+      case "BlockStatement":
+        return this.evaluateBlock(stmt.block);
+      case "IfStatement": {
+        const test = this.evaluateExpression(stmt.test);
+        if (test) return this.evaluateStatement(stmt.consequent);
+        else if (stmt.alternate) return this.evaluateStatement(stmt.alternate);
+        break;
+      }
       case "EmptyStatement":
         break;
       default:
@@ -140,7 +137,11 @@ export class Interpreter {
     if (variables.length > 1)
       throw new Error("reproduce this and handle it better");
     const variable = variables[0];
-    return this.variableMap.get(variable);
+    if (this.variableMap.has(variable)) {
+      return this.variableMap.get(variable);
+    } else {
+      return this.context[variable.name];
+    }
   }
   evaluateExpression(expr: Expression | null): any {
     // This might be wrong behavior.
@@ -154,7 +155,7 @@ export class Interpreter {
               return [name, this.evaluateExpression(prop.expression)];
             }
             default:
-              this.skipOrThrow(prop.type);
+              this.skipOrThrow(`${expr.type}[${prop.type}]`);
               return [];
           }
         });
@@ -173,17 +174,23 @@ export class Interpreter {
       case "FunctionExpression": 
         return new InterpreterFunction(expr, this);
       case "CallExpression": {
-        switch (expr.callee.type) {
-          case "IdentifierExpression": {
-            const fn = this.getVariableValue(expr.callee);
-            if (fn instanceof InterpreterFunction) {
-              return fn.execute()
-            } else {
-              throw new Error(`Can not execute non-function ${fn}`)
-            }
+        if (expr.callee.type === 'Super') return this.skipOrThrow(expr.callee.type);
+        const fn = this.evaluateExpression(expr.callee);
+        const args: any[] = [];
+        expr.arguments.forEach(_ => {
+          if (_.type === "SpreadElement") {
+            const value = this.evaluateExpression(_.expression);
+            args.push(...value);
+          } else {
+            args.push(this.evaluateExpression(_));
           }
-          default:
-            return this.skipOrThrow(expr.callee.type);
+        });
+      if (fn instanceof InterpreterFunction) {
+          return fn.execute(args);
+        } else if (typeof fn === 'function') {
+          return fn(...args)
+        } else {
+          throw new Error(`Can not execute non-function ${fn}`)
         }
       }
       case "AssignmentExpression": {
@@ -202,7 +209,7 @@ export class Interpreter {
         }
       }
       case "IdentifierExpression":
-        return this.getVariableValue(expr);
+          return this.getVariableValue(expr);
       case "LiteralStringExpression":
       case "LiteralNumericExpression":
       case "LiteralBooleanExpression":

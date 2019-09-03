@@ -1,15 +1,19 @@
-import { FunctionDeclaration, FunctionExpression } from "shift-ast";
+import { FunctionDeclaration, FunctionExpression, Method } from "shift-ast";
 import { Interpreter } from "./interpreter";
+import { InterpreterContext } from "./context";
+
+type FuncType = FunctionDeclaration | FunctionExpression | Method;
 
 export class InterpreterFunction {
-  private fn: FunctionDeclaration | FunctionExpression;
+  private fn: FuncType;
   private interpreter: Interpreter;
 
-  constructor(fn: FunctionDeclaration | FunctionExpression, interpreter: Interpreter) {
+  constructor(fn: FuncType, interpreter: Interpreter) {
     this.fn = fn;
     this.interpreter = interpreter;
   }
-  execute(args: any[]) {
+  execute(args: any[], context?: InterpreterContext) {
+    if (context) this.interpreter.pushContext(context);
     this.fn.params.items.forEach((param, i) => {
       if (param.type === 'BindingIdentifier') {
         this.interpreter.updateVariableValue(param, args[i]);
@@ -17,7 +21,9 @@ export class InterpreterFunction {
         this.interpreter.skipOrThrow(`Param type ${param.type}`);
       }
     });
-    return this.interpreter.evaluateBlock(this.fn.body);
+    const blockResult = this.interpreter.evaluateBlock(this.fn.body);
+    this.interpreter.popContext();
+    return blockResult.returnValue;
   }
 }
 

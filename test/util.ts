@@ -4,10 +4,10 @@ import { Interpreter } from "../src/interpreter";
 import { InterpreterContext } from "../src/context";
 
 export interface Result {
-  actual: any,
-  expected: any,
-  src: string,
-  success: boolean
+  actual: any;
+  expected: any;
+  src: string;
+  success: boolean;
 }
 
 export function assertResult(result: Result) {
@@ -16,12 +16,37 @@ export function assertResult(result: Result) {
     `${result.src}: Actual ${JSON.stringify(
       result.actual
     )}, Expected ${JSON.stringify(result.expected)}`
-  )
+  );
 }
 
-export function compare(src: string, context:InterpreterContext = {}): Result {
+export function assertError(src: string, error: string) {
+  const interpreter = new Interpreter();
+
+  let expected = "aaa",
+    actual = "bbb";
+  try {
+    eval(src);
+  } catch (e) {
+    expected = e.message;
+  }
+  try {
+    interpreter.evaluate(parseScript(src));
+  } catch (e) {
+    actual = e.message;
+  }
+
+  expect(actual).to.equal(expected);
+}
+
+export function compare(src: string, context?: InterpreterContext): Result {
   const interpreter = new Interpreter(context);
-  const expected = eval(src);
+  let expected;
+  try {
+    expected = eval(src);
+  } catch (e) {
+    console.error(src);
+    throw e;
+  }
   const actual = interpreter.evaluate(parseScript(src));
   const success = Number.isNaN(expected)
     ? Number.isNaN(actual)

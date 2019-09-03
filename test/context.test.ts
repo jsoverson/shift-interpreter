@@ -4,7 +4,7 @@ import spies from 'chai-spies';
 
 chai.use(spies);
 
-describe("Functions", () => {
+describe("External context", () => {
   it("should call functions defined on the context", () => {
     const console = {
       log: function(msg:string){return undefined}
@@ -15,11 +15,11 @@ describe("Functions", () => {
       console.log("Hello world");
     `, {console}));
 
-    debugger;
 
     expect(console.log).to.have.been.called.with("Hello world");
     
   });
+
 });
 
 

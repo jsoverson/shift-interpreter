@@ -1,7 +1,28 @@
-import { AssignmentTargetIdentifier, BindingIdentifier, Block, ClassDeclaration, DoWhileStatement, Expression, ForInStatement, ForOfStatement, ForStatement, FunctionBody, FunctionDeclaration, IdentifierExpression, Script, Statement, Super, VariableDeclaration, WhileStatement } from 'shift-ast';
-import shiftScope, { ScopeLookup } from 'shift-scope';
-import { InterpreterContext } from './context';
-import { IntermediateFunction } from './intermediate-types';
+import {
+  ArrayBinding,
+  AssignmentTargetIdentifier,
+  BindingIdentifier,
+  BindingWithDefault,
+  Block,
+  ClassDeclaration,
+  DoWhileStatement,
+  Expression,
+  ForInStatement,
+  ForOfStatement,
+  ForStatement,
+  FunctionBody,
+  FunctionDeclaration,
+  IdentifierExpression,
+  ObjectBinding,
+  Script,
+  Statement,
+  Super,
+  VariableDeclaration,
+  WhileStatement,
+} from 'shift-ast';
+import shiftScope, {ScopeLookup} from 'shift-scope';
+import {InterpreterContext} from './context';
+import {IntermediateFunction} from './intermediate-types';
 
 export class InterpreterRuntimeError extends Error {}
 
@@ -129,7 +150,7 @@ export class Interpreter {
         return this.declareFunction(stmt);
       case 'BlockStatement':
         return this.evaluateBlock(stmt.block).returnValue;
-      case 'ClassDeclaration': 
+      case 'ClassDeclaration':
         return this.declareClass(stmt);
       case 'IfStatement': {
         const test = this.evaluateExpression(stmt.test);
@@ -198,18 +219,18 @@ export class Interpreter {
 
     if (decl.elements.length > 0) {
       decl.elements.forEach(el => {
-        if (el.method.type === "Method") {
+        if (el.method.type === 'Method') {
           const intermediateFunction = new IntermediateFunction(el.method, this);
           if (el.isStatic) {
             staticMethods.push([intermediateFunction.name!, intermediateFunction]);
-          } else { 
+          } else {
             if (intermediateFunction.name === 'constructor') constructor = intermediateFunction;
             else methods.push([intermediateFunction.name!, intermediateFunction]);
           }
         } else {
           this.skipOrThrow(`ClassElement type ${el.method.type}`);
         }
-      })
+      });
     }
 
     interface DynamicClass {
@@ -219,42 +240,44 @@ export class Interpreter {
     let Class: DynamicClass = class {};
 
     if (decl.super) {
-      Class = ((SuperClass:any = this.evaluateExpression(decl.super)) => {
+      Class = ((SuperClass: any = this.evaluateExpression(decl.super)) => {
         if (constructor === null) {
           class InterpreterClassWithExtendsA extends SuperClass {
-            constructor(...args:any){super(...args);}
+            constructor(...args: any) {
+              super(...args);
+            }
           }
-  
+
           return InterpreterClassWithExtendsA;
         } else {
           class InterpreterClassWithExtendsB extends SuperClass {
-            constructor(...args:any){
+            constructor(...args: any) {
               super(...args);
               constructor!.execute(args, this);
             }
           }
-          
+
           return InterpreterClassWithExtendsB;
         }
-      })()
+      })();
     } else {
       Class = (() => {
         if (constructor === null) {
           class InterpreterClassA {
-            constructor(){}
+            constructor() {}
           }
-  
+
           return InterpreterClassA;
         } else {
           class InterpreterClassB {
-            constructor(...args:any){
+            constructor(...args: any) {
               constructor!.execute(args, this);
             }
           }
-          
+
           return InterpreterClassB;
         }
-      })()
+      })();
     }
 
     methods.forEach(([name, intermediateFunction]) => {
@@ -267,7 +290,7 @@ export class Interpreter {
 
     const variables = this.scopeLookup.get(decl.name);
 
-    variables.forEach((variable:any) => this.variableMap.set(variable, Class));
+    variables.forEach((variable: any) => this.variableMap.set(variable, Class));
 
     return Class;
   }
@@ -280,18 +303,55 @@ export class Interpreter {
     this.variableMap.set(variable, new IntermediateFunction(decl, this));
   }
   declareVariables(decl: VariableDeclaration) {
-    decl.declarators.forEach(declarator => {
-      if (declarator.binding.type === 'BindingIdentifier') {
-        const variables = this.scopeLookup.get(declarator.binding);
+    decl.declarators.forEach(declarator =>
+      this.bindVariable(declarator.binding, this.evaluateExpression(declarator.init)),
+    );
+  }
+  bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
+    switch (binding.type) {
+      case 'BindingIdentifier':
+        {
+          const variables = this.scopeLookup.get(binding);
 
-        if (variables.length > 1) throw new Error('reproduce this and handle it better');
-        const variable = variables[0];
-        const init = this.evaluateExpression(declarator.init);
-        this.variableMap.set(variable, init);
-      } else {
-        this.skipOrThrow(`VariableDeclaration ${declarator.binding.type}`);
-      }
-    });
+          if (variables.length > 1) throw new Error('reproduce this and handle it better');
+          const variable = variables[0];
+          this.variableMap.set(variable, init);
+        }
+        break;
+      case 'ArrayBinding':
+        {
+          binding.elements.forEach((el, i) => {
+            if (el) this.bindVariable(el, init[i]);
+          });
+          if (binding.rest) this.skipOrThrow('ArrayBinding->Rest/Spread');
+        }
+        break;
+      case 'ObjectBinding':
+        {
+          binding.properties.forEach(prop => {
+            if (prop.type === 'BindingPropertyIdentifier') {
+              const name = prop.binding.name;
+              if (init[name] === undefined && prop.init) {
+                this.bindVariable(prop.binding, this.evaluateExpression(prop.init));
+              } else {
+                this.bindVariable(prop.binding, init[name]);
+              }
+            } else {
+              const name =
+                prop.name.type === 'ComputedPropertyName'
+                  ? this.evaluateExpression(prop.name.expression)
+                  : prop.name.value;
+              this.bindVariable(prop.binding, init[name]);
+            }
+          });
+          if (binding.rest) this.skipOrThrow('ObjectBinding->Rest/Spread');
+        }
+        break;
+      case 'BindingWithDefault':
+        if (init === undefined) this.bindVariable(binding.binding, this.evaluateExpression(binding.init));
+        else this.bindVariable(binding, init);
+        break;
+    }
   }
   updateVariableValue(node: Identifier, value: any) {
     const variables = this.scopeLookup.get(node);
@@ -368,6 +428,11 @@ export class Interpreter {
                   ? prop.name.value
                   : this.evaluateExpression(prop.name.expression);
               return [name, new IntermediateFunction(prop, this)];
+            }
+            case 'ShorthandProperty': {
+              const name = prop.name.name;
+              const value = this.getVariableValue(prop.name);
+              return [name, value];
             }
             default:
               this.skipOrThrow(`${expr.type}[${prop.type}]`);
@@ -449,23 +514,35 @@ export class Interpreter {
       }
       case 'IdentifierExpression':
         return this.getVariableValue(expr);
+      case 'LiteralRegExpExpression': {
+        const flags = [
+          expr.global ? 'g' : '',
+          expr.ignoreCase ? 'i' : '',
+          expr.dotAll ? 's' : '',
+          expr.multiLine ? 'm' : '',
+          expr.sticky ? 'y' : '',
+          expr.unicode ? 'u' : '',
+        ].filter(_ => !!_);
+        return new RegExp(expr.pattern, ...flags);
+      }
       case 'LiteralStringExpression':
       case 'LiteralNumericExpression':
       case 'LiteralBooleanExpression':
-        debugger;
         return expr.value;
       case 'LiteralInfinityExpression':
         return 1 / 0;
       case 'LiteralNullExpression':
         return null;
-      case "TemplateExpression":
-        return expr.elements.map(el => {
-          if (el.type === 'TemplateElement') {
-            return el.rawValue;
-          } else {
-            return this.evaluateExpression(el)
-          }
-        }).join('');
+      case 'TemplateExpression':
+        return expr.elements
+          .map(el => {
+            if (el.type === 'TemplateElement') {
+              return el.rawValue;
+            } else {
+              return this.evaluateExpression(el);
+            }
+          })
+          .join('');
       case 'BinaryExpression': {
         const operation = binaryOperatorMap.get(expr.operator);
         return operation!(this.evaluateExpression(expr.left), this.evaluateExpression(expr.right));

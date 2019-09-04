@@ -37,7 +37,7 @@ describe("Literals", () => {
       // should it though? These are rarely seen. Deferring support until necessary.
     });  
   })
-  xit("should evaluate LiteralRegExpExpression", () => {
-    // I don't know how this should be implemented right now. Deferring support until necessary.
+  it("should evaluate LiteralRegExpExpression", () => {
+    assertResult(compare(`"abcd".match(/abcd/)[0] === 'abcd';`))
   });
 });

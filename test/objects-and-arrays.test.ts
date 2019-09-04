@@ -13,6 +13,9 @@ describe("Objects", () => {
   it("should evaluate methods on objects", () => {
     assertResult(compare('let a = {b(a){return a}}; a.b(2);'));
   });
+  it("should evaluate methods on objects", () => {
+    assertResult(compare('let b = 2; let a = {b}; a.b;'));
+  });
   it("should allow for object member assignment", () => {
     assertResult(compare('let a = {}; a.b = 2;'));
     assertResult(compare('let a = {}; a["b"] = 2;'));

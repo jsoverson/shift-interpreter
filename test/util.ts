@@ -22,8 +22,8 @@ export function assertResult(result: Result) {
 export function assertError(src: string, error: string) {
   const interpreter = new Interpreter();
 
-  let expected = "aaa",
-    actual = "bbb";
+  let expected = "No error",
+    actual = "No error";
   try {
     eval(src);
   } catch (e) {

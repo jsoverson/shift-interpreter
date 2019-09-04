@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-
-const interpret = require('..').interpret;
+const path = require('path');
+const { interpret } = require('..');
 
 const file = process.argv[2];
 
-const readFileSync = require('fs').readFileSync;
+const { readFileSync } = require('fs');
 
-const contents = readFileSync(file, 'utf8');
+const contents = readFileSync(file, 'utf8').replace(/^#!.*$/m,'');
 
 const context = {
   require,
@@ -15,6 +15,9 @@ const context = {
   console,
   ...global,
 }
+
+module.path = path.dirname(file);
+module.filename = file;
 
 console.log(interpret(contents, context));
 

@@ -8,4 +8,13 @@ const readFileSync = require('fs').readFileSync;
 
 const contents = readFileSync(file, 'utf8');
 
-console.log(interpret(contents, global));
+const context = {
+  require,
+  module,
+  process,
+  console,
+  ...global,
+}
+
+console.log(interpret(contents, context));
+

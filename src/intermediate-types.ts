@@ -1,16 +1,29 @@
-import { FunctionDeclaration, FunctionExpression, Method } from "shift-ast";
-import { Interpreter } from "./interpreter";
-import { InterpreterContext } from "./context";
+import { FunctionDeclaration, FunctionExpression, Method } from 'shift-ast';
+import { InterpreterContext } from './context';
+import { Interpreter } from './interpreter';
 
 type FuncType = FunctionDeclaration | FunctionExpression | Method;
 
-export class InterpreterFunction {
+export class IntermediateFunction {
+  name: string | null = null;
   private fn: FuncType;
   private interpreter: Interpreter;
 
   constructor(fn: FuncType, interpreter: Interpreter) {
     this.fn = fn;
     this.interpreter = interpreter;
+    if (fn.name) {
+      switch (fn.name.type) {
+        case 'BindingIdentifier':
+          this.name = fn.name.name;
+          break;
+        case 'ComputedPropertyName':
+          this.name = this.interpreter.evaluateExpression(fn.name.expression);
+          break;
+        case 'StaticPropertyName':
+          this.name = fn.name.value;
+      }
+    }
   }
   execute(args: any[], context?: InterpreterContext) {
     if (context) this.interpreter.pushContext(context);
@@ -26,10 +39,3 @@ export class InterpreterFunction {
     return blockResult.returnValue;
   }
 }
-
-// export class InterpreterObject {
-//   constructor() {
-//     this.fn = fn;
-//     this.interpreter = interpreter;
-//   }
-// }

@@ -18,3 +18,11 @@ describe("Objects", () => {
     assertResult(compare('let a = {}; a["b"] = 2;'));
   });
 });
+describe('Arrays', () => {
+  it("should parse array expressions", () => {
+    assertResult(compare('let a = [1,2,3,4]; a[3];'));
+  });
+  it("should parse array expressions with spread", () => {
+    assertResult(compare('let a = [1,2,3,4], b = [...a];'));
+  });
+});

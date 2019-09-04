@@ -1,16 +1,8 @@
-import { Interpreter } from "../src/interpreter";
-
 import { expect } from "chai";
-import {
-  Expression,
-  LiteralStringExpression,
-  LiteralNumericExpression,
-  LiteralBooleanExpression,
-  LiteralInfinityExpression,
-  LiteralNullExpression,
-  LiteralRegExpExpression
-} from "shift-ast";
-// import 'mocha';
+import { Expression, LiteralInfinityExpression } from "shift-ast";
+import { Interpreter } from "../src/interpreter";
+import { assertResult, compare } from "./util";
+
 
 function evaluate(expr: Expression) {
   const interpreter = new Interpreter();
@@ -19,42 +11,33 @@ function evaluate(expr: Expression) {
 
 describe("Literals", () => {
   it("should evaluate LiteralStringExpression", () => {
-    expect(evaluate(new LiteralStringExpression({ value: "Hello" }))).to.equal(
-      "Hello"
-    );
+    assertResult(compare('1/* prevent directive */;"hello"'));
   });
   it("should evaluate LiteralNumericExpression", () => {
-    expect(evaluate(new LiteralNumericExpression({ value: 20 }))).to.equal(20);
+    assertResult(compare('20'));
   });
   it("should evaluate LiteralBooleanExpression", () => {
-    expect(evaluate(new LiteralBooleanExpression({ value: true }))).to.equal(
-      true
-    );
-    expect(evaluate(new LiteralBooleanExpression({ value: false }))).to.equal(
-      false
-    );
+    assertResult(compare('true'));
+    assertResult(compare('false'));
   });
   it("should evaluate LiteralInfinityExpression", () => {
     expect(evaluate(new LiteralInfinityExpression())).to.equal(1 / 0);
   });
   it("should evaluate LiteralNullExpression", () => {
-    expect(evaluate(new LiteralNullExpression())).to.equal(null);
-    expect(evaluate(new LiteralNullExpression())).to.not.equal(undefined);
-    expect(evaluate(new LiteralNullExpression())).to.not.equal(false);
+    assertResult(compare('null'));
   });
+  describe('TemplateStrings', () => {
+    it("should evaluate basic templates", () => {
+      assertResult(compare('`hello world`'));
+    });  
+    it("should evaluate template strings with embedded expressions", () => {
+      assertResult(compare('`hello ${"world"}`'));
+    });  
+    xit("should evaluate tagged template strings", () => {
+      // should it though? These are rarely seen. Deferring support until necessary.
+    });  
+  })
   xit("should evaluate LiteralRegExpExpression", () => {
-    expect(
-      evaluate(
-        new LiteralRegExpExpression({
-          pattern: "ab",
-          global: true,
-          ignoreCase: false,
-          multiLine: false,
-          dotAll: false,
-          sticky: false,
-          unicode: false
-        })
-      )
-    ).to.equal(null);
+    // I don't know how this should be implemented right now. Deferring support until necessary.
   });
 });

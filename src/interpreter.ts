@@ -22,7 +22,8 @@ import {
 } from 'shift-ast';
 import shiftScope, {ScopeLookup} from 'shift-scope';
 import {InterpreterContext} from './context';
-import {IntermediateFunction} from './intermediate-types';
+import {InterpreterFunction, InterpreterArrowFunction} from './intermediate-types';
+import { isStatement } from './util';
 
 export class InterpreterRuntimeError extends Error {}
 
@@ -115,11 +116,20 @@ export class Interpreter {
   popContext() {
     return this.contexts.pop();
   }
-  evaluate(script?: Script) {
-    if (script) this.analyze(script);
-    const program = script || this.currentScript;
-    if (!program) throw new InterpreterRuntimeError('No script to evaluate');
-    return this.evaluateBlock(program).returnValue;
+  evaluate(script?: Script | Statement | Expression) {
+    if (!script) {
+      if (!this.currentScript) throw new InterpreterRuntimeError('No script to evaluate');
+      else script = this.currentScript;
+    }
+    if (script.type === 'Script') {
+      this.currentScript = script;
+      this.analyze(script);
+      return this.evaluateBlock(script).returnValue;
+    } else if (isStatement(script)) {
+      return this.evaluateStatement(script);
+    } else {
+      return this.evaluateExpression(script);
+    }
   }
   evaluateBlock(block: Block | Script | FunctionBody) {
     let returnValue;
@@ -162,6 +172,55 @@ export class Interpreter {
         break;
       case 'ContinueStatement':
         break;
+      
+      case 'ForOfStatement': {
+        this.currentLoops.push(stmt);
+        const iterationExpression = this.evaluateExpression(stmt.right);
+        function* nextValue() {
+          yield* iterationExpression;
+        }
+        let iterator = nextValue();
+        let result = null;
+
+        while(result = iterator.next()) {
+          if (result.done) break;
+          const { value } = result;
+          switch (stmt.left.type) {
+            case 'VariableDeclaration': {
+              this.declareVariables(stmt.left);
+              const binding = stmt.left.declarators[0].binding;
+              if (binding.type === 'BindingIdentifier') this.updateVariableValue(binding, value);
+              else this.skipOrThrow(stmt.type + '.left->' + binding.type);
+              debugger;
+              break;
+            }
+            default:
+              this.skipOrThrow(stmt.type + '.left->' + stmt.left.type);
+          }
+          this.evaluateStatement(stmt.body);
+        }
+        break;
+      }
+      case 'ForInStatement': {
+        this.currentLoops.push(stmt);
+        const iterationExpression = this.evaluateExpression(stmt.right);
+
+        switch (stmt.left.type) {
+          case 'VariableDeclaration': {
+            this.declareVariables(stmt.left);
+            const binding = stmt.left.declarators[0].binding;
+            for (let a in iterationExpression) {
+              if (binding.type === 'BindingIdentifier') this.updateVariableValue(binding, a);
+              else this.skipOrThrow(stmt.type + '.left->' + binding.type);
+              this.evaluateStatement(stmt.body);
+            }
+            break;
+          }
+          default:
+            this.skipOrThrow(stmt.type + '.left->' + stmt.left.type);
+        }
+        break;
+      }
       case 'ForStatement': {
         this.currentLoops.push(stmt);
         if (stmt.init) {
@@ -213,14 +272,16 @@ export class Interpreter {
     }
   }
   declareClass(decl: ClassDeclaration) {
-    const staticMethods: [string, IntermediateFunction][] = [];
-    const methods: [string, IntermediateFunction][] = [];
-    let constructor: null | IntermediateFunction = null;
+    const staticMethods: [string, InterpreterFunction][] = [];
+    const methods: [string, InterpreterFunction][] = [];
+    let constructor: null | InterpreterFunction = null;
+
+    debugger;
 
     if (decl.elements.length > 0) {
       decl.elements.forEach(el => {
         if (el.method.type === 'Method') {
-          const intermediateFunction = new IntermediateFunction(el.method, this);
+          const intermediateFunction = new InterpreterFunction(el.method, this);
           if (el.isStatic) {
             staticMethods.push([intermediateFunction.name!, intermediateFunction]);
           } else {
@@ -300,7 +361,7 @@ export class Interpreter {
     if (variables.length > 1) throw new Error('reproduce this and handle it better');
     const variable = variables[0];
 
-    this.variableMap.set(variable, new IntermediateFunction(decl, this));
+    this.variableMap.set(variable, new InterpreterFunction(decl, this));
   }
   declareVariables(decl: VariableDeclaration) {
     decl.declarators.forEach(declarator =>
@@ -349,7 +410,7 @@ export class Interpreter {
         break;
       case 'BindingWithDefault':
         if (init === undefined) this.bindVariable(binding.binding, this.evaluateExpression(binding.init));
-        else this.bindVariable(binding, init);
+        else this.bindVariable(binding.binding, init);
         break;
     }
   }
@@ -427,7 +488,7 @@ export class Interpreter {
                 prop.name.type === 'StaticPropertyName'
                   ? prop.name.value
                   : this.evaluateExpression(prop.name.expression);
-              return [name, new IntermediateFunction(prop, this)];
+              return [name, new InterpreterFunction(prop, this)];
             }
             case 'ShorthandProperty': {
               const name = prop.name.name;
@@ -455,8 +516,10 @@ export class Interpreter {
         // if (typeof value === "function") return value.bind(object);
         return value;
       }
+      case 'ArrowExpression':
+        return new InterpreterArrowFunction(expr, this.getCurrentContext(), this);
       case 'FunctionExpression':
-        return new IntermediateFunction(expr, this);
+        return new InterpreterFunction(expr, this);
       case 'CallExpression': {
         if (expr.callee.type === 'Super') return this.skipOrThrow(expr.callee.type);
 
@@ -482,10 +545,12 @@ export class Interpreter {
           fn = this.evaluateExpression(expr.callee);
         }
 
-        if (fn instanceof IntermediateFunction) {
+        if (fn instanceof InterpreterFunction) {
           return fn.execute(args, context);
         } else if (typeof fn === 'function') {
           return fn.apply(context, args);
+        } else if (fn instanceof InterpreterArrowFunction) {
+          return fn.execute(args);
         } else {
           throw new Error(`Can not execute non-function ${JSON.stringify(expr)}`);
         }

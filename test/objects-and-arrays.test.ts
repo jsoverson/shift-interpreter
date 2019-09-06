@@ -13,8 +13,11 @@ describe("Objects", () => {
   it("should evaluate methods on objects", () => {
     assertResult(compare('let a = {b(a){return a}}; a.b(2);'));
   });
-  it("should evaluate methods on objects", () => {
+  it("should evaluate shorthand props", () => {
     assertResult(compare('let b = 2; let a = {b}; a.b;'));
+  });
+  xit("should evaluate objects with rest/spread element", () => {
+    assertResult(compare('let b = {a:1,b:2,c:3}; let a = {...b}; a.a+a.b+a.c === b.a+b.b+b.c;'));
   });
   it("should allow for object member assignment", () => {
     assertResult(compare('let a = {}; a.b = 2;'));

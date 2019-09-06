@@ -2,19 +2,21 @@
 const path = require('path');
 const { interpret } = require('..');
 
-const file = process.argv[2];
+// get rid of node so this can run itself
+process.argv.shift();
+
+const file = process.argv[1];
 
 const { readFileSync } = require('fs');
 
 const contents = readFileSync(file, 'utf8').replace(/^#!.*$/m,'');
 
-const context = {
-  require,
-  module,
-  process,
-  console,
-  ...global,
-}
+const context = Object.assign({
+  require, 
+  module, 
+  process, 
+}, global);
+Object.setPrototypeOf(context, global);
 
 module.path = path.dirname(file);
 module.filename = file;

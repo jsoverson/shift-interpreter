@@ -191,7 +191,6 @@ export class Interpreter {
               const binding = stmt.left.declarators[0].binding;
               if (binding.type === 'BindingIdentifier') this.updateVariableValue(binding, value);
               else this.skipOrThrow(stmt.type + '.left->' + binding.type);
-              debugger;
               break;
             }
             default:
@@ -275,8 +274,6 @@ export class Interpreter {
     const staticMethods: [string, InterpreterFunction][] = [];
     const methods: [string, InterpreterFunction][] = [];
     let constructor: null | InterpreterFunction = null;
-
-    debugger;
 
     if (decl.elements.length > 0) {
       decl.elements.forEach(el => {

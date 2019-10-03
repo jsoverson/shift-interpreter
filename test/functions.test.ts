@@ -21,12 +21,12 @@ describe("Functions", () => {
     assertResult(
       compare(`
     var c = {
-      expected: "arsoten",
+      expected: "hello",
       test: function(actual) {
         return actual === c.expected;
       }
     };
-    c.test("arsoten");
+    c.test("hello");
     `)
     );
   });

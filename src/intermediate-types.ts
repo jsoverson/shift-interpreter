@@ -4,62 +4,51 @@ import { Interpreter } from './interpreter';
 
 type FuncType = FunctionDeclaration | FunctionExpression | Method;
 
-export class InterpreterFunction {
-  name: string | null = null;
-  private fn: FuncType;
-  private interpreter: Interpreter;
-
-  constructor(fn: FuncType, interpreter: Interpreter) {
-    this.fn = fn;
-    this.interpreter = interpreter;
-    if (fn.name) {
-      switch (fn.name.type) {
-        case 'BindingIdentifier':
-          this.name = fn.name.name;
-          break;
-        case 'ComputedPropertyName':
-          this.name = this.interpreter.evaluateExpression(fn.name.expression);
-          break;
-        case 'StaticPropertyName':
-          this.name = fn.name.value;
-      }
+export function createFunction(fn: FuncType, interpreter: Interpreter) {
+  let name = undefined;
+  if (fn.name) {
+    switch (fn.name.type) {
+      case 'BindingIdentifier':
+        name = fn.name.name;
+        break;
+      case 'ComputedPropertyName':
+        name = interpreter.evaluateExpression(fn.name.expression);
+        break;
+      case 'StaticPropertyName':
+        name = fn.name.value;
     }
   }
-  execute(args: any[], context?: InterpreterContext) {
-    if (context) this.interpreter.pushContext(context);
-    this.fn.params.items.forEach((param, i) => {
-      this.interpreter.bindVariable(param, args[i]);
-    });
-    const blockResult = this.interpreter.evaluateBlock(this.fn.body);
-    if (context) this.interpreter.popContext();
-    return blockResult.returnValue;
+
+  const fnContainer = {
+    [name]: function(...args:any) {
+      interpreter.pushContext(this);
+      fn.params.items.forEach((param, i) => {
+        interpreter.bindVariable(param, args[i]);
+      });
+      const blockResult = interpreter.evaluateBlock(fn.body);
+      if (context) interpreter.popContext();
+      return blockResult.returnValue;
+    }
   }
+  return fnContainer[name];
 }
 
-export class InterpreterArrowFunction {
-  name: string | null = null;
-  private fn: ArrowExpression;
-  private context: InterpreterContext;
-  private interpreter: Interpreter;
-
-  constructor(fn: ArrowExpression, context: InterpreterContext,  interpreter: Interpreter) {
-    this.fn = fn;
-    this.context = context;
-    this.interpreter = interpreter;
-  }
-  execute(args: any[]) {
-    this.interpreter.pushContext(this.context);
-    this.fn.params.items.forEach((param, i) => {
-      this.interpreter.bindVariable(param, args[i]);
-    });
-    let returnValue = undefined;
-    if (this.fn.body.type === 'FunctionBody') {
-      const blockResult = this.interpreter.evaluateBlock(this.fn.body);
-      returnValue = blockResult.returnValue;
-    } else {
-      returnValue = this.interpreter.evaluateExpression(this.fn.body)
+export function createArrowFunction(fn: ArrowExpression, context: InterpreterContext,  interpreter: Interpreter) {
+  return function(){
+    return (...args:any) => {
+      interpreter.pushContext(this as InterpreterContext);
+      fn.params.items.forEach((param, i) => {
+        interpreter.bindVariable(param, args[i]);
+      });
+      let returnValue = undefined;
+      if (fn.body.type === 'FunctionBody') {
+        const blockResult = interpreter.evaluateBlock(fn.body);
+        returnValue = blockResult.returnValue;
+      } else {
+        returnValue = interpreter.evaluateExpression(fn.body)
+      }
+      interpreter.popContext();
+      return returnValue;
     }
-    this.interpreter.popContext();
-    return returnValue;
-  }
+  }.bind(context)();
 }

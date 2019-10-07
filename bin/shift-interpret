@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 const path = require('path');
 const { interpret } = require('..');
+const { readFileSync } = require('fs');
+
+const commandLineArgs = require("command-line-args");
+
+const optionDefinitions = [
+  { name: "help", alias: "h", type: Boolean },
+  { name: "execute", alias: "e", type: String, multiple: true },
+];
+
+options = commandLineArgs(optionDefinitions, {stopAtFirstUnknown:false, partial:true});
+
+console.log(options);
 
 // get rid of node so this can run itself
 process.argv.shift();
 
 const file = process.argv[1];
-
-const { readFileSync } = require('fs');
 
 const contents = readFileSync(file, 'utf8').replace(/^#!.*$/m,'');
 

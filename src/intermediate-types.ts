@@ -1,8 +1,8 @@
-import { ArrowExpression, FunctionDeclaration, FunctionExpression, Method } from 'shift-ast';
+import { ArrowExpression, FunctionDeclaration, FunctionExpression, Method, Getter, Setter } from 'shift-ast';
 import { InterpreterContext } from './context';
 import { Interpreter } from './interpreter';
 
-type FuncType = FunctionDeclaration | FunctionExpression | Method;
+type FuncType = FunctionDeclaration | FunctionExpression | Method | Getter | Setter;
 
 export function createFunction(fn: FuncType, interpreter: Interpreter) {
   let name = undefined;
@@ -22,12 +22,18 @@ export function createFunction(fn: FuncType, interpreter: Interpreter) {
   const fnContainer = {
     [name]: function(...args:any) {
       interpreter.pushContext(this);
-      fn.params.items.forEach((param, i) => {
-        interpreter.bindVariable(param, args[i]);
-      });
+      if (fn.type === 'Getter') {
+        // TODO need anything here?
+      } else if(fn.type === 'Setter') {
+        interpreter.bindVariable(fn.param, args[0]);
+      } else {
+        fn.params.items.forEach((param, i) => {
+          interpreter.bindVariable(param, args[i]);
+        });
+      }
       const blockResult = interpreter.evaluateBlock(fn.body);
-      if (context) interpreter.popContext();
-      return blockResult.returnValue;
+      interpreter.popContext();
+      return blockResult.value;
     }
   }
   return fnContainer[name];
@@ -43,7 +49,7 @@ export function createArrowFunction(fn: ArrowExpression, context: InterpreterCon
       let returnValue = undefined;
       if (fn.body.type === 'FunctionBody') {
         const blockResult = interpreter.evaluateBlock(fn.body);
-        returnValue = blockResult.returnValue;
+        returnValue = blockResult.value;
       } else {
         returnValue = interpreter.evaluateExpression(fn.body)
       }

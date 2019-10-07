@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "@types/chai-spies": "^1.0.1",
+    "command-line-args": "^5.1.1",
+    "shift-ast": "^6.0.1",
     "shift-parser": "^7.0.0",
     "shift-scope": "^4.0.0"
   }

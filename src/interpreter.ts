@@ -32,8 +32,17 @@ export type Identifier = BindingIdentifier | IdentifierExpression | AssignmentTa
 
 type Loop = ForStatement | WhileStatement | ForOfStatement | ForInStatement | DoWhileStatement;
 
+type BlockType = Script | Block | FunctionBody;
+
 interface Options {
   skipUnsupported?: boolean;
+}
+
+interface ReturnValue {
+  didReturn: boolean,
+  didBreak: boolean,
+  didContinue: boolean,
+  value: any
 }
 
 export class Interpreter {
@@ -72,29 +81,35 @@ export class Interpreter {
     if (script.type === 'Script') {
       this.currentScript = script;
       this.analyze(script);
-      return this.evaluateBlock(script).returnValue;
+      return this.evaluateBlock(script).value;
     } else if (isStatement(script)) {
       return this.evaluateStatement(script);
     } else {
       return this.evaluateExpression(script);
     }
   }
-  evaluateBlock(block: Block | Script | FunctionBody) {
-    let returnValue;
+  evaluateBlock(block: BlockType): ReturnValue {
+    let value;
     let didBreak = false;
     let didContinue = false;
+    let didReturn = false;
     for (let i = 0; i < block.statements.length; i++) {
-      if (block.statements[i].type === 'BreakStatement') {
+      const statement = block.statements[i];
+      if (statement.type === 'BreakStatement') {
         didBreak = true;
         break;
       }
-      if (block.statements[i].type === 'ContinueStatement') {
+      if (statement.type === 'ContinueStatement') {
         didContinue = true;
         break;
       }
-      returnValue = this.evaluateStatement(block.statements[i]);
+      value = this.evaluateStatement(statement);
+      if (statement.type === 'ReturnStatement') {
+        didReturn = true;
+        break;
+      }
     }
-    return {returnValue, didBreak, didContinue};
+    return {value, didBreak, didContinue, didReturn};
   }
   evaluateStatement(stmt: Statement): any {
     if (!this.contexts) return;
@@ -264,7 +279,7 @@ export class Interpreter {
       for (let i = this.contexts.length - 1; i > -1; i--) {
         if (variable.name in this.contexts[i]) return this.contexts[i][variable.name];
       }
-      return undefined;
+      throw new ReferenceError(`${node.name} is not defined`);
     }
   }
   getCurrentContext() {

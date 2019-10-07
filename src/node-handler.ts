@@ -1,48 +1,51 @@
 import {
+  ArrayExpression,
+  ArrowExpression,
+  AssignmentExpression,
+  BinaryExpression,
   BlockStatement,
-  ClassDeclaration,
-  Expression,
-  ExpressionStatement,
-  FunctionDeclaration,
-  IfStatement,
-  ReturnStatement,
-  VariableDeclarationStatement,
   BreakStatement,
+  CallExpression,
+  ClassDeclaration,
+  CompoundAssignmentExpression,
+  ComputedMemberExpression,
   ContinueStatement,
-  ForOfStatement,
-  ForInStatement,
-  Script,
-  Statement,
-  ForStatement,
-  WhileStatement,
   DoWhileStatement,
   EmptyStatement,
-  ThisExpression,
-  NewExpression,
-  ArrayExpression,
-  ObjectExpression,
-  StaticMemberExpression,
-  ComputedMemberExpression,
-  CallExpression,
-  AssignmentExpression,
-  UpdateExpression,
-  CompoundAssignmentExpression,
-  LiteralRegExpExpression,
-  TemplateExpression,
-  UnaryExpression,
-  ArrowExpression,
+  Expression,
+  ExpressionStatement,
+  ForInStatement,
+  ForOfStatement,
+  ForStatement,
+  FunctionDeclaration,
   FunctionExpression,
   IdentifierExpression,
-  LiteralStringExpression,
-  LiteralNumericExpression,
+  IfStatement,
+  LiteralBooleanExpression,
   LiteralInfinityExpression,
   LiteralNullExpression,
-  BinaryExpression,
-  LiteralBooleanExpression,
+  LiteralNumericExpression,
+  LiteralRegExpExpression,
+  LiteralStringExpression,
+  NewExpression,
+  ObjectExpression,
+  ReturnStatement,
+  Script,
+  Statement,
+  StaticMemberExpression,
+  TemplateExpression,
+  ThisExpression,
+  ThrowStatement,
+  UnaryExpression,
+  UpdateExpression,
+  VariableDeclarationStatement,
+  WhileStatement,
+  TryCatchStatement,
+  TryFinallyStatement,
 } from 'shift-ast';
-import {Interpreter, Identifier} from './interpreter';
-import {createFunction, createArrowFunction} from './intermediate-types';
-import {compoundAssignmentOperatorMap, unaryOperatorMap, binaryOperatorMap} from './operators';
+import {createArrowFunction, createFunction} from './intermediate-types';
+import {Identifier, Interpreter} from './interpreter';
+import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
 
 type ShiftNode = typeof Script | ForInStatement | Statement | Expression;
 
@@ -67,7 +70,7 @@ nodeHandler.set(VariableDeclarationStatement.name, (i: Interpreter, stmt: Variab
 
 nodeHandler.set(FunctionDeclaration.name, (i: Interpreter, stmt: FunctionDeclaration) => i.declareFunction(stmt));
 
-nodeHandler.set(BlockStatement.name, (i: Interpreter, stmt: BlockStatement) => i.evaluateBlock(stmt.block).returnValue);
+nodeHandler.set(BlockStatement.name, (i: Interpreter, stmt: BlockStatement) => i.evaluateBlock(stmt.block).value);
 
 nodeHandler.set(ClassDeclaration.name, (i: Interpreter, stmt: ClassDeclaration) => i.declareClass(stmt));
 
@@ -80,6 +83,38 @@ nodeHandler.set(IfStatement.name, (i: Interpreter, stmt: IfStatement) => {
 nodeHandler.set(BreakStatement.name, () => {});
 nodeHandler.set(ContinueStatement.name, () => {});
 nodeHandler.set(EmptyStatement.name, () => {});
+
+nodeHandler.set(ThrowStatement.name, (i: Interpreter, stmt: ThrowStatement) => {
+  throw i.evaluateExpression(stmt.expression);
+});
+
+nodeHandler.set(TryCatchStatement.name, (i: Interpreter, stmt: TryCatchStatement) => {
+  try {
+    i.evaluateBlock(stmt.body);
+  } catch (e) {
+    i.bindVariable(stmt.catchClause.binding, e);
+    i.evaluateBlock(stmt.catchClause.body);
+  }
+});
+
+nodeHandler.set(TryFinallyStatement.name, (i: Interpreter, stmt: TryFinallyStatement) => {
+  if (stmt.catchClause) {
+    try {
+      i.evaluateBlock(stmt.body);
+    } catch (e) {
+      i.bindVariable(stmt.catchClause.binding, e);
+      i.evaluateBlock(stmt.catchClause.body);
+    } finally {
+      i.evaluateBlock(stmt.finalizer);
+    }
+  } else {
+    try {
+      i.evaluateBlock(stmt.body);
+    } finally {
+      i.evaluateBlock(stmt.finalizer);
+    }
+  }
+});
 
 nodeHandler.set(ForOfStatement.name, (i: Interpreter, stmt: ForOfStatement) => {
   i.currentLoops.push(stmt);
@@ -203,29 +238,63 @@ nodeHandler.set(ArrayExpression.name, (i: Interpreter, expr: ArrayExpression) =>
 });
 
 nodeHandler.set(ObjectExpression.name, (i: Interpreter, expr: ObjectExpression) => {
-  const entries = expr.properties.map(prop => {
+  const obj: {[key: string]: any} = {};
+  const batchOperations: Map<string, Map<string, (() => any)>> = new Map();
+  function getPropertyDescriptors(name: string) {
+    if (batchOperations.has(name)) return batchOperations.get(name)!;
+    const operations = new Map();
+    batchOperations.set(name, operations);
+    return operations;
+  }
+  expr.properties.forEach(prop => {
     switch (prop.type) {
       case 'DataProperty': {
         const name =
           prop.name.type === 'StaticPropertyName' ? prop.name.value : i.evaluateExpression(prop.name.expression);
-        return [name, i.evaluateExpression(prop.expression)];
+        obj[name] = i.evaluateExpression(prop.expression);
+        break;
       }
       case 'Method': {
         const name =
           prop.name.type === 'StaticPropertyName' ? prop.name.value : i.evaluateExpression(prop.name.expression);
-        return [name, createFunction(prop, i)];
+        obj[name] = createFunction(prop, i);
+        break;
       }
       case 'ShorthandProperty': {
         const name = prop.name.name;
         const value = i.getVariableValue(prop.name);
-        return [name, value];
+        obj[name] = value;
+        break;
+      }
+      case 'Getter': {
+        const name =
+          prop.name.type === 'StaticPropertyName' ? prop.name.value : i.evaluateExpression(prop.name.expression);
+        const operations = getPropertyDescriptors(name);
+        operations.set('get', createFunction(prop, i));
+        break;
+      }
+      case 'Setter': {
+        const name =
+          prop.name.type === 'StaticPropertyName' ? prop.name.value : i.evaluateExpression(prop.name.expression);
+        const operations = getPropertyDescriptors(name);
+        operations.set('set', createFunction(prop, i));
+        break;
       }
       default:
         i.skipOrThrow(`${expr.type}[${prop.type}]`);
-        return [];
     }
   });
-  return Object.fromEntries(entries);
+  
+  Array.from(batchOperations.entries()).forEach(([prop, ops]) => {
+    const descriptor:PropertyDescriptor = {
+      get: ops.get('get'),
+      set: ops.get('set'),
+      configurable: true
+    };
+    Object.defineProperty(obj, prop, descriptor);
+  });
+
+  return obj;
 });
 
 nodeHandler.set(StaticMemberExpression.name, (i: Interpreter, expr: StaticMemberExpression) => {

@@ -1,5 +1,6 @@
+import { parseScript } from "shift-parser";
 import { Interpreter } from '../src/interpreter';
-import {parseScript} from "shift-parser";
+import { assertResult, compare } from "./util";
 
 describe("ExoticScenarios", () => {
   it("should allow piecemeal execution", () => {
@@ -157,5 +158,8 @@ describe("ExoticScenarios", () => {
     // const exprValue = interpreter.evaluateStatement(tree.statements[2])
     
   });
+  it.only('should have a global this', () => {
+    assertResult(compare(`var __importStar = (this && this.__importStar)`))
+  })
 });
 

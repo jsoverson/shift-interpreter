@@ -50,8 +50,24 @@ describe("Functions", () => {
   it("should store and execute function expressions", () => {
     assertResult(compare("let a = function(){return 2}; a();"));
   });
-  it.only("should return from sub statements", () => {
+  it("should return from sub statements", () => {
     assertResult(compare("function a() { if (true) return 'in branch'; return 'should not get here'}; a();"));
+  });
+  it("should return from sub blocks", () => {
+    assertResult(compare(`
+
+    function _isSameValue(a, b) {
+      if (a === b) {
+        // Handle +/-0 vs. -/+0
+        return a !== 0 || 1 / a === 1 / b;
+      }
+    
+      // Handle NaN vs. NaN
+      return a !== a && b !== b;
+    };    
+
+    _isSameValue("1","1");
+    `));
   });
 });
 

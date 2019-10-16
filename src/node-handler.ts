@@ -44,7 +44,7 @@ import {
   TryFinallyStatement,
 } from 'shift-ast';
 import {createArrowFunction, createFunction} from './intermediate-types';
-import {Identifier, Interpreter} from './interpreter';
+import {Identifier, Interpreter, ReturnValueWithState} from './interpreter';
 import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
 
 type ShiftNode = typeof Script | ForInStatement | Statement | Expression;
@@ -53,24 +53,25 @@ type NodeHandler = Map<string | ShiftNode, Function>;
 
 export const nodeHandler: NodeHandler = new Map();
 
-function evaluateChildExpression(interpreter: Interpreter, stmt: {expression: Expression}) {
-  return interpreter.evaluateExpression(stmt.expression);
-}
-
 function getLiteralValue(interpreter: Interpreter, expr: {value: any}) {
   return expr.value;
 }
 
-nodeHandler.set(ReturnStatement.name, evaluateChildExpression);
-nodeHandler.set(ExpressionStatement.name, evaluateChildExpression);
+nodeHandler.set(ReturnStatement.name, (i: Interpreter, stmt: ReturnStatement) => 
+  new ReturnValueWithState(i.evaluateExpression(stmt.expression), {didReturn: true})
+);
+
+nodeHandler.set(ExpressionStatement.name, (i: Interpreter, stmt: ExpressionStatement) => 
+  i.evaluateExpression(stmt.expression)
+);
 
 nodeHandler.set(VariableDeclarationStatement.name, (i: Interpreter, stmt: VariableDeclarationStatement) =>
-  i.declareVariables(stmt.declaration),
+  i.declareVariables(stmt.declaration)
 );
 
 nodeHandler.set(FunctionDeclaration.name, (i: Interpreter, stmt: FunctionDeclaration) => i.declareFunction(stmt));
 
-nodeHandler.set(BlockStatement.name, (i: Interpreter, stmt: BlockStatement) => i.evaluateBlock(stmt.block).value);
+nodeHandler.set(BlockStatement.name, (i: Interpreter, stmt: BlockStatement) => i.evaluateBlock(stmt.block));
 
 nodeHandler.set(ClassDeclaration.name, (i: Interpreter, stmt: ClassDeclaration) => i.declareClass(stmt));
 
@@ -89,31 +90,56 @@ nodeHandler.set(ThrowStatement.name, (i: Interpreter, stmt: ThrowStatement) => {
 });
 
 nodeHandler.set(TryCatchStatement.name, (i: Interpreter, stmt: TryCatchStatement) => {
+  let returnValue = undefined;
   try {
-    i.evaluateBlock(stmt.body);
+    returnValue = i.evaluateBlock(stmt.body);
+    if (returnValue instanceof ReturnValueWithState) {
+      if (returnValue.didReturn) return returnValue;
+    }
   } catch (e) {
     i.bindVariable(stmt.catchClause.binding, e);
-    i.evaluateBlock(stmt.catchClause.body);
+    returnValue = i.evaluateBlock(stmt.catchClause.body);
+    if (returnValue instanceof ReturnValueWithState) {
+      if (returnValue.didReturn) return returnValue;
+    }
   }
+  return returnValue;
 });
 
 nodeHandler.set(TryFinallyStatement.name, (i: Interpreter, stmt: TryFinallyStatement) => {
+  let returnValue = undefined;
   if (stmt.catchClause) {
     try {
-      i.evaluateBlock(stmt.body);
+      returnValue = i.evaluateBlock(stmt.body);
+      if (returnValue instanceof ReturnValueWithState) {
+        if (returnValue.didReturn) return returnValue;
+      }
     } catch (e) {
       i.bindVariable(stmt.catchClause.binding, e);
-      i.evaluateBlock(stmt.catchClause.body);
+      returnValue = i.evaluateBlock(stmt.catchClause.body);
+      if (returnValue instanceof ReturnValueWithState) {
+        if (returnValue.didReturn) return returnValue;
+      }
     } finally {
-      i.evaluateBlock(stmt.finalizer);
+      returnValue = i.evaluateBlock(stmt.finalizer);
+      if (returnValue instanceof ReturnValueWithState) {
+        if (returnValue.didReturn) return returnValue;
+      }
     }
   } else {
     try {
-      i.evaluateBlock(stmt.body);
+      returnValue = i.evaluateBlock(stmt.body);
+      if (returnValue instanceof ReturnValueWithState) {
+        if (returnValue.didReturn) return returnValue;
+      }
     } finally {
-      i.evaluateBlock(stmt.finalizer);
+      returnValue = i.evaluateBlock(stmt.finalizer);
+      if (returnValue instanceof ReturnValueWithState) {
+        if (returnValue.didReturn) return returnValue;
+      }
     }
   }
+  return returnValue;
 });
 
 nodeHandler.set(ForOfStatement.name, (i: Interpreter, stmt: ForOfStatement) => {

@@ -38,11 +38,18 @@ interface Options {
   skipUnsupported?: boolean;
 }
 
-interface ReturnValue {
-  didReturn: boolean,
-  didBreak: boolean,
-  didContinue: boolean,
-  value: any
+export class ReturnValueWithState {
+  didReturn = false;
+  didBreak = false;
+  didContinue = false;
+  value: any;
+
+  constructor(value: any, { didReturn = false, didContinue = false, didBreak = false } = {}) {
+    this.value = value;
+    this.didContinue = didContinue;
+    this.didBreak = didBreak;
+    this.didReturn = didReturn;
+  }
 }
 
 export class Interpreter {
@@ -88,7 +95,7 @@ export class Interpreter {
       return this.evaluateExpression(script);
     }
   }
-  evaluateBlock(block: BlockType): ReturnValue {
+  evaluateBlock(block: BlockType): ReturnValueWithState {
     let value;
     let didBreak = false;
     let didContinue = false;
@@ -104,18 +111,21 @@ export class Interpreter {
         break;
       }
       value = this.evaluateStatement(statement);
+      if (value instanceof ReturnValueWithState) {
+        if (value.didReturn) return value;
+      }
       if (statement.type === 'ReturnStatement') {
         didReturn = true;
         break;
       }
     }
-    return {value, didBreak, didContinue, didReturn};
+    return new ReturnValueWithState(value, {didBreak, didContinue, didReturn});
   }
-  evaluateStatement(stmt: Statement): any {
+  evaluateStatement(stmt: Statement): ReturnValueWithState | any | void {
     if (!this.contexts) return;
     const handler = nodeHandler.get(stmt.type);
     if (handler) return handler(this, stmt);
-    return this.skipOrThrow(stmt.type);
+    this.skipOrThrow(stmt.type);
   }
   declareClass(decl: ClassDeclaration) {
     const staticMethods: [string, Function][] = [];

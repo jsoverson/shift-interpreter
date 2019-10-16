@@ -16,6 +16,7 @@ describe("Objects", () => {
   it("should evaluate shorthand props", () => {
     assertResult(compare('let b = 2; let a = {b}; a.b;'));
   });
+  // ES2018, not implemented in shift parser yet
   xit("should evaluate objects with rest/spread element", () => {
     assertResult(compare('let b = {a:1,b:2,c:3}; let a = {...b}; a.a+a.b+a.c === b.a+b.b+b.c;'));
   });

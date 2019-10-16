@@ -7,23 +7,18 @@ describe("Try/Catch", () => {
   it("should allow rethrowing", () => {
     assertResult(compare(`try{ throw new Error('err') } catch(e) {throw e}`, {Error}))
   });
-  it('should return from catch?', () => {
+  it('should return from catch', () => {
     assertResult(compare(`
     let assert = {};
     function assertThrows(expectedErrorConstructor, func) {
-      console.log('running func')
       try {
         func();
       } catch (thrown) {
-        console.log('in catch')
-        console.log(thrown.constructor === expectedErrorConstructor);
         if (thrown.constructor !== expectedErrorConstructor) {
           return 'Expected a ' + expectedErrorConstructor.name + ' but got a ' + thrown.constructor.name;
         }
-        console.log('um should be returning')
         return 'OK';
       }
-      console.log('shouldnt get here')
       return 'Expected a ' + expectedErrorConstructor.name + ' to be thrown but no exception was thrown at all';
     };
 

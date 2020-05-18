@@ -13,13 +13,15 @@ describe("Variables", () => {
 
   it("decltype-less assignments should assign a global", () => {
     assertResult(compare('function a() { b = 2; } a(); b'))
+    // @ts-ignore
+    delete global.b;
   });
   
   it("var statements should be hoisted", () => {
     assertResult(compare('function a() { b = 2; var b; } a(); b'))
   });
   
-  it.only("should assign to hoisted variables", () => {
+  it("should assign to hoisted variables", () => {
     assertResult(compare('function a() { return b; b = 3; var b = 2; } a()'))
     assertResult(compare('function a() { b = 3; return b; var b = 2; } a()'))
     assertResult(compare('function a() { b = 3; var b = 2; return b; } a()'))

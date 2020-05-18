@@ -19,8 +19,11 @@ import {
   Super,
   VariableDeclaration,
   WhileStatement,
+  VariableDeclarationStatement,
+  VariableDeclarator,
 } from 'shift-ast';
-import shiftScope, {ScopeLookup} from 'shift-scope';
+import shiftScope, { ScopeLookup } from 'shift-scope';
+
 import {InterpreterContext} from './context';
 import {createFunction} from './intermediate-types';
 import {nodeHandler} from './node-handler';
@@ -29,6 +32,10 @@ import {isStatement} from './util';
 export class InterpreterRuntimeError extends Error {}
 
 export type Identifier = BindingIdentifier | IdentifierExpression | AssignmentTargetIdentifier;
+
+export interface DynamicClass {
+  [key: string]: any;
+}
 
 type Loop = ForStatement | WhileStatement | ForOfStatement | ForInStatement | DoWhileStatement;
 
@@ -59,6 +66,8 @@ export class Interpreter {
   private variableMap = new Map();
   private options: Options;
   private currentScript?: Script;
+
+  argumentsMap = new WeakMap();
   currentLoops: Loop[] = [];
 
   constructor(context: InterpreterContext = {}, options: Options = {}) {
@@ -100,6 +109,20 @@ export class Interpreter {
     let didBreak = false;
     let didContinue = false;
     let didReturn = false;
+
+    // Hoist function declarations.
+    const functions = block.statements.filter(s => s.type === 'FunctionDeclaration');
+    functions.forEach(fnDecl => {
+      this.evaluateStatement(fnDecl);
+    })
+
+    const vars = block.statements
+      .filter(<(T: Statement) => T is VariableDeclarationStatement>(stmt => stmt.type === 'VariableDeclarationStatement'))
+      .filter((decl:VariableDeclarationStatement) => decl.declaration.kind === 'var');
+    vars.forEach(varDecl => {
+      this.evaluateStatement(varDecl);
+    })
+
     for (let i = 0; i < block.statements.length; i++) {
       const statement = block.statements[i];
       if (statement.type === 'BreakStatement') {
@@ -110,7 +133,9 @@ export class Interpreter {
         didContinue = true;
         break;
       }
-      value = this.evaluateStatement(statement);
+      if (statement.type !== 'FunctionDeclaration') {
+        value = this.evaluateStatement(statement);
+      }
       if (value instanceof ReturnValueWithState) {
         if (value.didReturn) return value;
       }
@@ -146,10 +171,6 @@ export class Interpreter {
           this.skipOrThrow(`ClassElement type ${el.method.type}`);
         }
       });
-    }
-
-    interface DynamicClass {
-      [key: string]: any;
     }
 
     let Class: DynamicClass = class {};
@@ -220,10 +241,10 @@ export class Interpreter {
     this.variableMap.set(variable, fn);
   }
   declareVariables(decl: VariableDeclaration) {
-    decl.declarators.forEach(declarator =>
-      this.bindVariable(declarator.binding, this.evaluateExpression(declarator.init)),
-    );
+    const declaratorHandler = nodeHandler.get(VariableDeclarator.name)?.bind(this);
+    decl.declarators.forEach(declaratorHandler);
   }
+
   bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
     switch (binding.type) {
       case 'BindingIdentifier':
@@ -281,11 +302,21 @@ export class Interpreter {
   getVariableValue(node: Identifier): any {
     const variables = this.scopeLookup.get(node);
 
+    if (!variables) {
+      throw new Error(`${node.type} variable not found. Make sure you are passing a valid Identifier node.`);
+    }
+
     if (variables.length > 1) throw new Error('reproduce this and handle it better');
     const variable = variables[0];
+
     if (this.variableMap.has(variable)) {
       return this.variableMap.get(variable);
     } else {
+      if (node.name === 'arguments') {
+        if (this.argumentsMap.has(this.getCurrentContext())) {
+          return this.argumentsMap.get(this.getCurrentContext());
+        }
+      }
       for (let i = this.contexts.length - 1; i > -1; i--) {
         if (variable.name in this.contexts[i]) return this.contexts[i][variable.name];
       }

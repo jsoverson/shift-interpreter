@@ -2,28 +2,37 @@
   "name": "shift-interpreter",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "scripts": {
-    "test": "mocha -r ts-node/register test/**/*.test.ts",
-    "format": "prettier --write \"src/**/*.ts\""
+    "build": "tsc",
+    "compile": "npm run clean && tsc --declaration",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run compile",
+    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts'",
+    "watch": "tsc -w",
+    "test": "mocha"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/chai": "^4.2.0",
+    "@types/chai": "^4.2.11",
+    "@types/chai-spies": "^1.0.1",
+    "@types/debug": "^4.1.5",
     "@types/mocha": "^5.2.7",
+    "@types/node": "^13.13.4",
     "chai": "^4.2.0",
     "chai-spies": "^1.0.0",
-    "mocha": "^6.2.0",
-    "prettier": "^1.18.2",
-    "ts-node": "^8.3.0",
+    "mocha": "^6.2.3",
+    "prettier": "^1.19.1",
+    "ts-node": "^8.9.1",
     "tslint": "^5.19.0",
-    "typescript": "^3.6.2"
+    "typescript": "^3.8.3"
   },
   "dependencies": {
-    "@types/chai-spies": "^1.0.1",
     "command-line-args": "^5.1.1",
+    "debug": "^4.1.1",
     "shift-ast": "^6.0.1",
     "shift-parser": "^7.0.0",
     "shift-scope": "^4.0.0"

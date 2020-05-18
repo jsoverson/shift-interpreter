@@ -1,0 +1,52 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.binaryOperatorMap = new Map([
+    ['+', (l, r) => l + r],
+    ['-', (l, r) => l - r],
+    ['/', (l, r) => l / r],
+    ['*', (l, r) => l * r],
+    ['**', (l, r) => l ** r],
+    ['==', (l, r) => l == r],
+    ['!=', (l, r) => l != r],
+    ['===', (l, r) => l === r],
+    ['!==', (l, r) => l !== r],
+    ['<', (l, r) => l < r],
+    ['<=', (l, r) => l <= r],
+    ['>', (l, r) => l > r],
+    ['>=', (l, r) => l >= r],
+    ['in', (l, r) => l in r],
+    ['instanceof', (l, r) => l instanceof r],
+    ['<<', (l, r) => l << r],
+    ['>>', (l, r) => l >> r],
+    ['>>>', (l, r) => l >>> r],
+    ['%', (l, r) => l % r],
+    [',', (l, r) => r],
+    ['||', (l, r) => l || r],
+    ['&&', (l, r) => l && r],
+    ['|', (l, r) => l | r],
+    ['&', (l, r) => l & r],
+    ['^', (l, r) => l ^ r],
+]);
+exports.unaryOperatorMap = new Map([
+    ['+', (oper) => +oper],
+    ['-', (oper) => -oper],
+    ['!', (oper) => !oper],
+    ['~', (oper) => ~oper],
+    ['typeof', (oper) => typeof oper],
+    ['void', (oper) => void oper],
+]);
+exports.compoundAssignmentOperatorMap = new Map([
+    ['+=', (l, r) => l + r],
+    ['-=', (l, r) => l - r],
+    ['/=', (l, r) => l / r],
+    ['*=', (l, r) => l * r],
+    ['**=', (l, r) => l ** r],
+    ['<<=', (l, r) => l << r],
+    ['>>=', (l, r) => l >> r],
+    ['>>>=', (l, r) => l >>> r],
+    ['%=', (l, r) => l % r],
+    ['|=', (l, r) => l | r],
+    ['&=', (l, r) => l & r],
+    ['^=', (l, r) => l ^ r],
+]);
+//# sourceMappingURL=operators.js.map

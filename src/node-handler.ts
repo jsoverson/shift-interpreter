@@ -1,55 +1,9 @@
-import {
-  ArrayExpression,
-  ArrowExpression,
-  AssignmentExpression,
-  BinaryExpression,
-  BlockStatement,
-  BreakStatement,
-  CallExpression,
-  ClassDeclaration,
-  CompoundAssignmentExpression,
-  ComputedMemberExpression,
-  ContinueStatement,
-  DoWhileStatement,
-  EmptyStatement,
-  Expression,
-  ExpressionStatement,
-  ForInStatement,
-  ForOfStatement,
-  ForStatement,
-  FunctionDeclaration,
-  FunctionExpression,
-  IdentifierExpression,
-  IfStatement,
-  LiteralBooleanExpression,
-  LiteralInfinityExpression,
-  LiteralNullExpression,
-  LiteralNumericExpression,
-  LiteralRegExpExpression,
-  LiteralStringExpression,
-  NewExpression,
-  ObjectExpression,
-  ReturnStatement,
-  Script,
-  Statement,
-  StaticMemberExpression,
-  TemplateExpression,
-  ThisExpression,
-  ThrowStatement,
-  UnaryExpression,
-  UpdateExpression,
-  VariableDeclarationStatement,
-  WhileStatement,
-  TryCatchStatement,
-  TryFinallyStatement,
-} from 'shift-ast';
-import {createArrowFunction, createFunction} from './intermediate-types';
-import {Identifier, Interpreter, ReturnValueWithState} from './interpreter';
-import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
+import { ArrayExpression, ArrowExpression, AssignmentExpression, BinaryExpression, BlockStatement, BreakStatement, CallExpression, ClassDeclaration, CompoundAssignmentExpression, ComputedMemberExpression, ConditionalExpression, ContinueStatement, DoWhileStatement, EmptyStatement, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, IdentifierExpression, IfStatement, LiteralBooleanExpression, LiteralInfinityExpression, LiteralNullExpression, LiteralNumericExpression, LiteralRegExpExpression, LiteralStringExpression, NewExpression, ObjectExpression, ReturnStatement, StaticMemberExpression, TemplateExpression, ThisExpression, ThrowStatement, TryCatchStatement, TryFinallyStatement, UnaryExpression, UpdateExpression, VariableDeclarationStatement, VariableDeclarator, WhileStatement } from 'shift-ast';
+import { createArrowFunction, createFunction } from './intermediate-types';
+import { Identifier, Interpreter, ReturnValueWithState } from './interpreter';
+import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } from './operators';
 
-type ShiftNode = typeof Script | ForInStatement | Statement | Expression;
-
-type NodeHandler = Map<string | ShiftNode, Function>;
+type NodeHandler = Map<string, Function>;
 
 export const nodeHandler: NodeHandler = new Map();
 
@@ -69,6 +23,10 @@ nodeHandler.set(VariableDeclarationStatement.name, (i: Interpreter, stmt: Variab
   i.declareVariables(stmt.declaration)
 );
 
+nodeHandler.set(VariableDeclarator.name, (i: Interpreter, declarator: VariableDeclarator) => {
+  i.bindVariable(declarator.binding, i.evaluateExpression(declarator.init));  
+})
+
 nodeHandler.set(FunctionDeclaration.name, (i: Interpreter, stmt: FunctionDeclaration) => i.declareFunction(stmt));
 
 nodeHandler.set(BlockStatement.name, (i: Interpreter, stmt: BlockStatement) => i.evaluateBlock(stmt.block));
@@ -79,6 +37,12 @@ nodeHandler.set(IfStatement.name, (i: Interpreter, stmt: IfStatement) => {
   const test = i.evaluateExpression(stmt.test);
   if (test) return i.evaluateStatement(stmt.consequent);
   else if (stmt.alternate) return i.evaluateStatement(stmt.alternate);
+});
+
+nodeHandler.set(ConditionalExpression.name, (i: Interpreter, stmt: ConditionalExpression) => {
+  const test = i.evaluateExpression(stmt.test);
+  if (test) return i.evaluateExpression(stmt.consequent);
+  else if (stmt.alternate) return i.evaluateExpression(stmt.alternate);
 });
 
 nodeHandler.set(BreakStatement.name, () => {});

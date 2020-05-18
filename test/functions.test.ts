@@ -4,6 +4,9 @@ describe("Functions", () => {
   it("should declare functions", () => {
     assertResult(compare("function a(){return 2}; a();"));
   });
+  it("should hoist functions", () => {
+    assertResult(compare("a.foo = 'bar'; function a(){}; a.foo;"));
+  });
   it("should assign arrow expressions", () => {
     assertResult(compare("let a = (a) => {return a}; a(4)"));
   });
@@ -18,6 +21,9 @@ describe("Functions", () => {
   });
   it("should call functions with arguments", () => {
     assertResult(compare("function a(a,b){return a+b}; a(2,5) === 7;"));
+  });
+  it("should allow reference to arguments special variable", () => {
+    assertResult(compare("function a(b){return arguments[0] + 10}; a(33);"));
   });
   it("should access appropriate context", () => {
     assertResult(

@@ -4,11 +4,9 @@ import { assertResult, compare } from "./util";
 describe("Classes", () => {
   it("should declare a class", () => {
     assertResult(compare('class A {}; A === A'));
-    // assertResult(compare('class A {b(){return 2}}; const a = new A(); a.b();'));
   });
   it("should allow static methods to be called", () => {
     assertResult(compare('class A {static b(){return 20}}; A.b();'));
-    // assertResult(compare('class A {b(){return 2}}; const a = new A(); a.b();'));
   });
   it("should allow class to be instantiated methods to be called", () => {
     assertResult(compare('class A {b(){return 2222}}; let a = new A(); a.b();'));

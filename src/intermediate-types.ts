@@ -1,8 +1,23 @@
-import { ArrowExpression, FunctionDeclaration, FunctionExpression, Method, Getter, Setter } from 'shift-ast';
+import { ArrowExpression, FunctionDeclaration, FunctionExpression, Method, Getter, Setter, FormalParameters } from 'shift-ast';
 import { InterpreterContext } from './context';
 import { Interpreter } from './interpreter';
 
 type FuncType = FunctionDeclaration | FunctionExpression | Method | Getter | Setter;
+
+export class xArguments implements ArrayLike<any> {
+  callee: (...args: any) => any;
+  length:number;
+  [x:number]:any;
+
+  constructor(interpreter: Interpreter, callee: (...args: any) => any, params: FormalParameters) {
+    this.callee = callee;
+    this.length = 0;
+    for (let i = 0; i < params.items.length; i++) {
+      const item = params.items[i];
+    }
+
+  }
+}
 
 export function createFunction(fn: FuncType, interpreter: Interpreter) {
   let name = undefined;
@@ -22,6 +37,7 @@ export function createFunction(fn: FuncType, interpreter: Interpreter) {
   const fnContainer = {
     [name]: function(...args:any) {
       interpreter.pushContext(this);
+      interpreter.argumentsMap.set(this, arguments);
       if (fn.type === 'Getter') {
         // TODO need anything here?
       } else if(fn.type === 'Setter') {
@@ -40,9 +56,9 @@ export function createFunction(fn: FuncType, interpreter: Interpreter) {
 }
 
 export function createArrowFunction(fn: ArrowExpression, context: InterpreterContext,  interpreter: Interpreter) {
-  return function(){
+  return function(this: InterpreterContext){
     return (...args:any) => {
-      interpreter.pushContext(this as InterpreterContext);
+      interpreter.pushContext(this);
       fn.params.items.forEach((param, i) => {
         interpreter.bindVariable(param, args[i]);
       });

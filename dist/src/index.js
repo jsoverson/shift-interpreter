@@ -14,5 +14,6 @@ exports.interpretTree = interpretTree;
 exports.interpret = interpretSource;
 var interpreter_2 = require("./interpreter");
 exports.Interpreter = interpreter_2.Interpreter;
-exports.ReturnValueWithState = interpreter_2.ReturnValueWithState;
+var return_value_1 = require("./return-value");
+exports.ReturnValueWithState = return_value_1.ReturnValueWithState;
 //# sourceMappingURL=index.js.map

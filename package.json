@@ -31,10 +31,13 @@
     "typescript": "^3.8.3"
   },
   "dependencies": {
+    "chalk": "^4.0.0",
     "command-line-args": "^5.1.1",
     "debug": "^4.1.1",
-    "shift-ast": "^6.0.1",
+    "shift-ast": "^6.1.0",
+    "shift-codegen": "^7.0.0",
     "shift-parser": "^7.0.0",
+    "shift-printer": "^1.0.1",
     "shift-scope": "^4.0.0"
   }
 }

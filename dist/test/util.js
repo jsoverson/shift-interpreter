@@ -1,8 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
 const shift_parser_1 = require("shift-parser");
 const interpreter_1 = require("../src/interpreter");
+const debug_1 = __importDefault(require("debug"));
+const debug = debug_1.default('shift:interpreter:test');
+const evaluate = require('./nostrict-eval.js').eval;
 function assertResult(result) {
     const message = result.expectedError ?
         `${result.src}: Actual "${result.actualError.message}", Expected "${result.expectedError.message}"` :
@@ -11,10 +17,11 @@ function assertResult(result) {
 }
 exports.assertResult = assertResult;
 function assertError(src, error) {
+    debug(`assertError(\`${src}\`)`);
     const interpreter = new interpreter_1.Interpreter();
     let expected = "No error", actual = "No error";
     try {
-        eval(src);
+        evaluate(src);
     }
     catch (e) {
         expected = e.message;
@@ -25,48 +32,73 @@ function assertError(src, error) {
     catch (e) {
         actual = e.message;
     }
+    if (actual)
+        debug(`Interpreter error: ${actual}`);
+    if (expected)
+        debug(`Native error: ${expected}`);
     chai_1.expect(actual).to.equal(expected);
 }
 exports.assertError = assertError;
 function compare(src, context) {
-    const interpreter = new interpreter_1.Interpreter(context);
-    let expected, expectedError;
+    const interpreter = new interpreter_1.Interpreter();
+    if (context)
+        interpreter.pushContext(context);
+    let nativeExpectedValue, nativeExpectedError;
+    debug(`compare(\`${src}\`)`);
     try {
-        expected = eval(src);
+        nativeExpectedValue = evaluate(src);
     }
     catch (e) {
-        expectedError = e;
+        nativeExpectedError = e;
     }
-    let actual, actualError;
+    let interpreterActualValue, interpreterActualError;
     try {
-        actual = interpreter.evaluate(shift_parser_1.parseScript(src));
+        interpreterActualValue = interpreter.evaluate(shift_parser_1.parseScript(src));
     }
     catch (e) {
-        actualError = e;
+        interpreterActualError = e;
     }
+    debug(`== Interpreter result: ${interpreterActualValue}`);
+    debug(`== Native result     : ${nativeExpectedValue}`);
+    if (interpreterActualError)
+        debug(`!! Interpreter error: ${interpreterActualError.message}`);
+    else
+        debug(`!! Interpreter error: <none>`);
+    if (nativeExpectedError)
+        debug(`!! Native error     : ${nativeExpectedError.message}`);
+    else
+        debug(`!! Native error     : <none>`);
     let success = false;
-    if (Number.isNaN(expected)) {
-        success = Number.isNaN(actual);
+    if (Number.isNaN(nativeExpectedValue)) {
+        success = Number.isNaN(interpreterActualValue);
+        debug(`Interpreter produced NaN, Native produced ${interpreterActualValue}`);
     }
-    else if (expectedError) {
-        if (!actualError) {
-            actualError = { message: '<<Did not throw an error>>' };
+    else if (nativeExpectedError) {
+        if (!interpreterActualError) {
+            debug(`Failure: Native produced error, Interpreter did not`);
+            interpreterActualError = { message: '<<Did not throw an error>>' };
             success = false;
         }
         else {
-            success = actualError.message === expectedError.message;
+            success = interpreterActualError.message === nativeExpectedError.message;
+            debug(`Both produced errors (same===${success})`);
         }
     }
     else {
-        if (actualError)
-            console.log(actualError);
-        success = expected === actual;
+        if (interpreterActualError) {
+            debug(`Failure: Interpreter produced error, Native did not`);
+            console.log(interpreterActualError);
+            success = false;
+        }
+        else {
+            success = nativeExpectedValue === interpreterActualValue;
+        }
     }
     return {
-        actual,
-        actualError,
-        expected,
-        expectedError,
+        actual: interpreterActualValue,
+        actualError: interpreterActualError,
+        expected: nativeExpectedValue,
+        expectedError: nativeExpectedError,
         src,
         success
     };

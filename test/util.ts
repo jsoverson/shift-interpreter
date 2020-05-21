@@ -51,7 +51,8 @@ export function assertError(src: string, error: string) {
 }
 
 export function compare(src: string, context?: InterpreterContext): Result {
-  const interpreter = new Interpreter(context);
+  const interpreter = new Interpreter();
+  if (context) interpreter.pushContext(context);
   let nativeExpectedValue, nativeExpectedError;
   debug(`compare(\`${src}\`)`);
   try {

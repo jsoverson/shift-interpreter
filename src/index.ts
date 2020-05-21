@@ -1,4 +1,3 @@
-
 import { Script } from 'shift-ast';
 import { parseScript } from 'shift-parser';
 import { Interpreter } from './interpreter';
@@ -14,4 +13,5 @@ export function interpretTree(tree: Script, context = {}) {
 
 export const interpret = interpretSource;
 
-export { Interpreter, ReturnValueWithState } from './interpreter';
+export { Interpreter } from './interpreter';
+export { ReturnValueWithState } from './return-value';

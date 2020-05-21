@@ -11,8 +11,18 @@ describe("Variables", () => {
     it("should update values", () => {
         util_1.assertResult(util_1.compare('let a = 2; a = a + 2; a;'));
     });
-    it.only("decltype-less assignments should assign a global", () => {
+    it("decltype-less assignments should assign a global", () => {
         util_1.assertResult(util_1.compare('function a() { b = 2; } a(); b'));
+        // @ts-ignore
+        delete global.b;
+    });
+    it("var statements should be hoisted", () => {
+        util_1.assertResult(util_1.compare('function a() { b = 2; var b; } a(); b'));
+    });
+    it("should assign to hoisted variables", () => {
+        util_1.assertResult(util_1.compare('function a() { return b; b = 3; var b = 2; } a()'));
+        util_1.assertResult(util_1.compare('function a() { b = 3; return b; var b = 2; } a()'));
+        util_1.assertResult(util_1.compare('function a() { b = 3; var b = 2; return b; } a()'));
     });
     it("should support const", () => {
         util_1.assertResult(util_1.compare('const a = 2; a;'));

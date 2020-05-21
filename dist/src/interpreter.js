@@ -6,38 +6,38 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const shift_scope_1 = __importStar(require("shift-scope"));
-const intermediate_types_1 = require("./intermediate-types");
+const return_value_1 = require("./return-value");
+const errors_1 = require("./errors");
 const node_handler_1 = require("./node-handler");
 const util_1 = require("./util");
-class InterpreterRuntimeError extends Error {
-}
-exports.InterpreterRuntimeError = InterpreterRuntimeError;
-class ReturnValueWithState {
-    constructor(value, { didReturn = false, didContinue = false, didBreak = false } = {}) {
-        this.didReturn = false;
-        this.didBreak = false;
-        this.didContinue = false;
-        this.value = value;
-        this.didContinue = didContinue;
-        this.didBreak = didBreak;
-        this.didReturn = didReturn;
-    }
-}
-exports.ReturnValueWithState = ReturnValueWithState;
+const codegen = __importStar(require("shift-printer"));
+const chalk_1 = __importDefault(require("chalk"));
 class Interpreter {
-    constructor(context = {}, options = {}) {
+    constructor(options = {}) {
+        this.contexts = [{}];
         this.variableMap = new Map();
         this.argumentsMap = new WeakMap();
         this.currentLoops = [];
-        this.contexts = [context];
         this.options = options;
+        if (this.options.handler) {
+            this.handler = new this.options.handler(this);
+        }
+        else {
+            this.handler = new node_handler_1.NodeHandler(this);
+        }
+    }
+    print(node) {
+        return codegen.prettyPrint(node || this.currentNode);
     }
     skipOrThrow(type) {
         if (this.options.skipUnsupported)
             return;
-        throw new InterpreterRuntimeError(`Unsupported node ${type}`);
+        throw new errors_1.InterpreterRuntimeError(`Unsupported node ${type}`);
     }
     analyze(script) {
         this.globalScope = shift_scope_1.default(script);
@@ -50,24 +50,56 @@ class Interpreter {
     popContext() {
         return this.contexts.pop();
     }
-    evaluate(script) {
-        if (!script) {
-            if (!this.currentScript)
-                throw new InterpreterRuntimeError('No script to evaluate');
+    evaluate(passedNode) {
+        let nodeToEvaluate = undefined;
+        if (passedNode) {
+            if (passedNode.type === 'Script') {
+                this.analyze(passedNode);
+            }
+            nodeToEvaluate = passedNode;
+        }
+        else if (this.currentScript) {
+            nodeToEvaluate = this.currentScript;
+        }
+        if (!this.currentScript) {
+            // If we don't have a currentScript (haven't run analyze()) but were passed a node
+            // the node must be a Statement or Expression (or bad object) and we shouldn't run
+            // it without the user knowing what they are doing.
+            if (passedNode)
+                throw new errors_1.InterpreterRuntimeError(`Can not evaluate ${passedNode.type} node without analyzing a host program (Script node) first. If you know what you are doing, use .evaluateStatement() or .evaluateExpression() directly.`);
             else
-                script = this.currentScript;
+                throw new errors_1.InterpreterRuntimeError('No program to evaluate');
         }
-        if (script.type === 'Script') {
-            this.currentScript = script;
-            this.analyze(script);
-            return this.evaluateBlock(script).value;
+        if (!nodeToEvaluate) {
+            throw new errors_1.InterpreterRuntimeError('No program to evaluate');
         }
-        else if (util_1.isStatement(script)) {
-            return this.evaluateStatement(script);
+        try {
+            if (nodeToEvaluate.type === 'Script') {
+                return this.evaluateBlock(nodeToEvaluate).value;
+            }
+            else if (util_1.isStatement(nodeToEvaluate)) {
+                return this.evaluateStatement(nodeToEvaluate);
+            }
+            else {
+                return this.evaluateExpression(nodeToEvaluate);
+            }
         }
-        else {
-            return this.evaluateExpression(script);
+        catch (e) {
+            const statementSrc = codegen.printSummary(this.currentStatement);
+            const currentNodeSrc = codegen.printSummary(this.currentNode);
+            console.log(statementSrc.replace(currentNodeSrc, `👉👉👉${chalk_1.default.red(currentNodeSrc)}`));
+            throw e;
         }
+    }
+    evaluateToFirstError(passedNode) {
+        try {
+            this.evaluate(passedNode);
+        }
+        catch {
+        }
+    }
+    step() {
+        throw new Error("Method not implemented.");
     }
     evaluateBlock(block) {
         let value;
@@ -79,6 +111,12 @@ class Interpreter {
         functions.forEach(fnDecl => {
             this.evaluateStatement(fnDecl);
         });
+        const vars = block.statements
+            .filter((stmt => stmt.type === 'VariableDeclarationStatement'))
+            .filter((decl) => decl.declaration.kind === 'var');
+        vars.forEach(varDecl => {
+            this.hoistVars(varDecl);
+        });
         for (let i = 0; i < block.statements.length; i++) {
             const statement = block.statements[i];
             if (statement.type === 'BreakStatement') {
@@ -89,10 +127,13 @@ class Interpreter {
                 didContinue = true;
                 break;
             }
+            // skip over functions we've already declared above
+            if (statement.type === 'ReturnStatement')
+                debugger;
             if (statement.type !== 'FunctionDeclaration') {
                 value = this.evaluateStatement(statement);
             }
-            if (value instanceof ReturnValueWithState) {
+            if (value instanceof return_value_1.ReturnValueWithState) {
                 if (value.didReturn)
                     return value;
             }
@@ -101,100 +142,81 @@ class Interpreter {
                 break;
             }
         }
-        return new ReturnValueWithState(value, { didBreak, didContinue, didReturn });
+        return new return_value_1.ReturnValueWithState(value, { didBreak, didContinue, didReturn });
+    }
+    hoistVars(varDecl) {
+        varDecl.declaration.declarators.forEach(declarator => {
+            this.bindVariable(declarator.binding, undefined);
+        });
     }
     evaluateStatement(stmt) {
         if (!this.contexts)
             return;
-        const handler = node_handler_1.nodeHandler.get(stmt.type);
-        if (handler)
-            return handler(this, stmt);
-        this.skipOrThrow(stmt.type);
-    }
-    declareClass(decl) {
-        const staticMethods = [];
-        const methods = [];
-        let constructor = null;
-        if (decl.elements.length > 0) {
-            decl.elements.forEach(el => {
-                if (el.method.type === 'Method') {
-                    const intermediateFunction = intermediate_types_1.createFunction(el.method, this);
-                    if (el.isStatic) {
-                        staticMethods.push([intermediateFunction.name, intermediateFunction]);
-                    }
-                    else {
-                        if (intermediateFunction.name === 'constructor')
-                            constructor = intermediateFunction;
-                        else
-                            methods.push([intermediateFunction.name, intermediateFunction]);
-                    }
-                }
-                else {
-                    this.skipOrThrow(`ClassElement type ${el.method.type}`);
-                }
-            });
-        }
-        let Class = class {
-        };
-        if (decl.super) {
-            Class = ((SuperClass = this.evaluateExpression(decl.super)) => {
-                if (constructor === null) {
-                    class InterpreterClassWithExtendsA extends SuperClass {
-                        constructor(...args) {
-                            super(...args);
-                        }
-                    }
-                    return InterpreterClassWithExtendsA;
-                }
-                else {
-                    class InterpreterClassWithExtendsB extends SuperClass {
-                        constructor(...args) {
-                            super(...args);
-                            constructor(args, this);
-                        }
-                    }
-                    return InterpreterClassWithExtendsB;
-                }
-            })();
-        }
-        else {
-            Class = (() => {
-                if (constructor === null) {
-                    class InterpreterClassA {
-                        constructor() { }
-                    }
-                    return InterpreterClassA;
-                }
-                else {
-                    class InterpreterClassB {
-                        constructor(...args) {
-                            constructor(args, this);
-                        }
-                    }
-                    return InterpreterClassB;
-                }
-            })();
-        }
-        methods.forEach(([name, intermediateFunction]) => {
-            Class.prototype[name] = intermediateFunction;
-        });
-        staticMethods.forEach(([name, intermediateFunction]) => {
-            Class[name] = intermediateFunction;
-        });
-        const variables = this.scopeLookup.get(decl.name);
-        variables.forEach((variable) => this.variableMap.set(variable, Class));
-        return Class;
-    }
-    declareFunction(decl) {
-        const variables = this.scopeLookup.get(decl.name);
-        if (variables.length > 1)
-            throw new Error('reproduce this and handle it better');
-        const variable = variables[0];
-        const fn = intermediate_types_1.createFunction(decl, this);
-        this.variableMap.set(variable, fn);
+        this.currentNode = stmt;
+        this.currentStatement = stmt;
+        return this.handler[stmt.type](stmt);
     }
     declareVariables(decl) {
-        decl.declarators.forEach(declarator => this.bindVariable(declarator.binding, this.evaluateExpression(declarator.init)));
+        decl.declarators.forEach(declarator => {
+            this.currentNode = declarator;
+            return this.handler.VariableDeclarator(declarator);
+        });
+    }
+    createFunction(fn) {
+        let name = undefined;
+        if (fn.name) {
+            switch (fn.name.type) {
+                case 'BindingIdentifier':
+                    name = fn.name.name;
+                    break;
+                case 'ComputedPropertyName':
+                    name = this.evaluateExpression(fn.name.expression);
+                    break;
+                case 'StaticPropertyName':
+                    name = fn.name.value;
+            }
+        }
+        const interpreter = this;
+        if (name) {
+            return ({ [name]: function (...args) {
+                    interpreter.pushContext(this);
+                    interpreter.argumentsMap.set(this, arguments);
+                    if (fn.type === 'Getter') {
+                        // TODO need anything here?
+                    }
+                    else if (fn.type === 'Setter') {
+                        interpreter.bindVariable(fn.param, args[0]);
+                    }
+                    else {
+                        fn.params.items.forEach((param, i) => {
+                            interpreter.bindVariable(param, args[i]);
+                        });
+                    }
+                    const blockResult = interpreter.evaluateBlock(fn.body);
+                    interpreter.popContext();
+                    return blockResult.value;
+                } })[name];
+        }
+        else {
+            return function (...args) {
+                interpreter.pushContext(this);
+                interpreter.argumentsMap.set(this, arguments);
+                if (fn.type === 'Getter') {
+                    // TODO need anything here?
+                }
+                else if (fn.type === 'Setter') {
+                    interpreter.bindVariable(fn.param, args[0]);
+                }
+                else {
+                    fn.params.items.forEach((param, i) => {
+                        interpreter.bindVariable(param, args[i]);
+                    });
+                }
+                const blockResult = interpreter.evaluateBlock(fn.body);
+                interpreter.popContext();
+                return blockResult.value;
+            };
+        }
     }
     bindVariable(binding, init) {
         switch (binding.type) {
@@ -289,10 +311,8 @@ class Interpreter {
             return;
         if (!this.contexts)
             return;
-        const handler = node_handler_1.nodeHandler.get(expr.type);
-        if (handler)
-            return handler(this, expr);
-        return this.skipOrThrow(expr.type);
+        this.currentNode = expr;
+        return this.handler[expr.type](expr);
     }
 }
 exports.Interpreter = Interpreter;

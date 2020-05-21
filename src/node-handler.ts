@@ -1,48 +1,13 @@
-import {
-  ArrayExpression,
-  ArrowExpression,
-  AssignmentExpression,
-  BinaryExpression,
-  BlockStatement,
-  CallExpression,
-  ClassDeclaration,
-  CompoundAssignmentExpression,
-  ComputedMemberExpression,
-  ConditionalExpression,
-  DoWhileStatement,
-  ExpressionStatement,
-  ForInStatement,
-  ForOfStatement,
-  ForStatement,
-  FunctionDeclaration,
-  FunctionExpression,
-  IdentifierExpression,
-  IfStatement,
-  LiteralBooleanExpression,
-  LiteralInfinityExpression,
-  LiteralNullExpression,
-  LiteralNumericExpression,
-  LiteralRegExpExpression,
-  LiteralStringExpression,
-  NewExpression,
-  ObjectExpression,
-  ReturnStatement,
-  StaticMemberExpression,
-  TemplateExpression,
-  ThisExpression,
-  ThrowStatement,
-  TryCatchStatement,
-  TryFinallyStatement,
-  UnaryExpression,
-  UpdateExpression,
-  VariableDeclarationStatement,
-  VariableDeclarator,
-  WhileStatement,
-} from 'shift-ast';
-import { createArrowFunction, createFunction } from './intermediate-types';
-import { Identifier, Interpreter, ReturnValueWithState } from './interpreter';
-import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } from './operators';
+import { ArrayExpression, ArrowExpression, AssignmentExpression, BinaryExpression, BlockStatement, CallExpression, ClassDeclaration, CompoundAssignmentExpression, ComputedMemberExpression, ConditionalExpression, DoWhileStatement, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, IdentifierExpression, IfStatement, LiteralBooleanExpression, LiteralInfinityExpression, LiteralNullExpression, LiteralNumericExpression, LiteralRegExpExpression, LiteralStringExpression, NewExpression, ObjectExpression, ReturnStatement, StaticMemberExpression, TemplateExpression, ThisExpression, ThrowStatement, TryCatchStatement, TryFinallyStatement, UnaryExpression, UpdateExpression, VariableDeclarationStatement, VariableDeclarator, WhileStatement } from 'shift-ast';
 import { InterpreterRuntimeError } from './errors';
+import { Identifier, Interpreter } from './interpreter';
+import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } from './operators';
+import { ReturnValueWithState } from './return-value';
+import { InterpreterContext } from './context';
+
+export interface DynamicClass {
+  [key: string]: any;
+}
 
 export class NodeHandler {
   interpreter: Interpreter;
@@ -66,16 +31,98 @@ export class NodeHandler {
     return this.interpreter.bindVariable(declarator.binding, this.interpreter.evaluateExpression(declarator.init));
   }
 
-  FunctionDeclaration(stmt: FunctionDeclaration) {
-    return this.interpreter.declareFunction(stmt);
+  FunctionDeclaration(decl: FunctionDeclaration) {
+    const variables = this.interpreter.scopeLookup.get(decl.name);
+
+    if (variables.length > 1) throw new Error('reproduce this and handle it better');
+    const variable = variables[0];
+
+    const fn = this.interpreter.createFunction(decl);
+
+    this.interpreter.variableMap.set(variable, fn);
   }
 
   BlockStatement(stmt: BlockStatement) {
     return this.interpreter.evaluateBlock(stmt.block);
   }
 
-  ClassDeclaration(stmt: ClassDeclaration) {
-    return this.interpreter.declareClass(stmt);
+  ClassDeclaration(decl: ClassDeclaration) {
+    const staticMethods: [string, Function][] = [];
+    const methods: [string, Function][] = [];
+    let constructor: null | Function = null;
+
+    if (decl.elements.length > 0) {
+      decl.elements.forEach(el => {
+        if (el.method.type === 'Method') {
+          const intermediateFunction = this.interpreter.createFunction(el.method);
+          if (el.isStatic) {
+            staticMethods.push([intermediateFunction.name!, intermediateFunction]);
+          } else {
+            if (intermediateFunction.name === 'constructor') constructor = intermediateFunction;
+            else methods.push([intermediateFunction.name!, intermediateFunction]);
+          }
+        } else {
+          this.interpreter.skipOrThrow(`ClassElement type ${el.method.type}`);
+        }
+      });
+    }
+
+    let Class: DynamicClass = class {};
+
+    if (decl.super) {
+      Class = ((SuperClass: any = this.interpreter.evaluateExpression(decl.super)) => {
+        if (constructor === null) {
+          class InterpreterClassWithExtendsA extends SuperClass {
+            constructor(...args: any) {
+              super(...args);
+            }
+          }
+
+          return InterpreterClassWithExtendsA;
+        } else {
+          class InterpreterClassWithExtendsB extends SuperClass {
+            constructor(...args: any) {
+              super(...args);
+              constructor!(args, this);
+            }
+          }
+
+          return InterpreterClassWithExtendsB;
+        }
+      })();
+    } else {
+      Class = (() => {
+        if (constructor === null) {
+          class InterpreterClassA {
+            constructor() {}
+          }
+
+          return InterpreterClassA;
+        } else {
+          class InterpreterClassB {
+            constructor(...args: any) {
+              constructor!(args, this);
+            }
+          }
+
+          return InterpreterClassB;
+        }
+      })();
+    }
+
+    methods.forEach(([name, intermediateFunction]) => {
+      Class.prototype[name] = intermediateFunction;
+    });
+
+    staticMethods.forEach(([name, intermediateFunction]) => {
+      Class[name] = intermediateFunction;
+    });
+
+    const variables = this.interpreter.scopeLookup.get(decl.name);
+
+    variables.forEach((variable: any) => this.interpreter.variableMap.set(variable, Class));
+
+    return Class;
   }
 
   IfStatement(stmt: IfStatement) {
@@ -254,6 +301,7 @@ export class NodeHandler {
       }
     });
 
+    this.interpreter.currentNode = expr;
     return new ClassTarget(...args);
   }
 
@@ -294,7 +342,7 @@ export class NodeHandler {
             prop.name.type === 'StaticPropertyName'
               ? prop.name.value
               : this.interpreter.evaluateExpression(prop.name.expression);
-          obj[name] = createFunction(prop, this.interpreter);
+          obj[name] = this.interpreter.createFunction(prop);
           break;
         }
         case 'ShorthandProperty': {
@@ -309,7 +357,7 @@ export class NodeHandler {
               ? prop.name.value
               : this.interpreter.evaluateExpression(prop.name.expression);
           const operations = getPropertyDescriptors(name);
-          operations.set('get', createFunction(prop, this.interpreter));
+          operations.set('get', this.interpreter.createFunction(prop));
           break;
         }
         case 'Setter': {
@@ -318,7 +366,7 @@ export class NodeHandler {
               ? prop.name.value
               : this.interpreter.evaluateExpression(prop.name.expression);
           const operations = getPropertyDescriptors(name);
-          operations.set('set', createFunction(prop, this.interpreter));
+          operations.set('set', this.interpreter.createFunction(prop));
           break;
         }
         default:
@@ -490,10 +538,28 @@ export class NodeHandler {
   }
 
   ArrowExpression(expr: ArrowExpression) {
-    return createArrowFunction(expr, this.interpreter.getCurrentContext(), this.interpreter);
+    const interpreter = this.interpreter;
+
+    return function(this: InterpreterContext){
+      return (...args:any) => {
+        interpreter.pushContext(this);
+        expr.params.items.forEach((param, i) => {
+          interpreter.bindVariable(param, args[i]);
+        });
+        let returnValue = undefined;
+        if (expr.body.type === 'FunctionBody') {
+          const blockResult = interpreter.evaluateBlock(expr.body);
+          returnValue = blockResult.value;
+        } else {
+          returnValue = interpreter.evaluateExpression(expr.body)
+        }
+        interpreter.popContext();
+        return returnValue;
+      }
+    }.bind(interpreter.getCurrentContext())();
   }
   FunctionExpression(expr: FunctionExpression) {
-    return createFunction(expr, this.interpreter);
+    return this.interpreter.createFunction(expr);
   }
   IdentifierExpression(expr: IdentifierExpression) {
     return this.interpreter.getVariableValue(expr);

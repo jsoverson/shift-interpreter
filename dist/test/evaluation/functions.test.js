@@ -2,32 +2,32 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const util_1 = require("../util");
 describe("Functions", () => {
-    it("should declare functions", () => {
-        util_1.assertResult(util_1.compare("function a(){return 2}; a();"));
+    it("should declare functions", async () => {
+        util_1.assertResult(await util_1.compare("function a(){return 2}; a();"));
     });
-    it("should hoist functions", () => {
-        util_1.assertResult(util_1.compare("a.foo = 'bar'; function a(){}; a.foo;"));
+    it("should hoist functions", async () => {
+        util_1.assertResult(await util_1.compare("a.foo = 'bar'; function a(){}; a.foo;"));
     });
-    it("should assign arrow expressions", () => {
-        util_1.assertResult(util_1.compare("let a = (a) => {return a}; a(4)"));
+    it("should assign arrow expressions", async () => {
+        util_1.assertResult(await util_1.compare("let a = (a) => {return a}; a(4)"));
     });
-    it("arrow expressions should retain `this` binding", () => {
-        util_1.assertResult(util_1.compare("let a = { a: () => {return this.b}, b: 44 }; const b = a.a; a.a() + b();"));
+    it("arrow expressions should retain `this` binding", async () => {
+        util_1.assertResult(await util_1.compare("let a = { a: () => {return this.b}, b: 44 }; const b = a.a; a.a() + b();"));
     });
-    it("should evaluate shorthand arrow expressions", () => {
-        util_1.assertResult(util_1.compare("let a = _ => _ + 10; a(2);"));
+    it("should evaluate shorthand arrow expressions", async () => {
+        util_1.assertResult(await util_1.compare("let a = _ => _ + 10; a(2);"));
     });
-    it("should call functions with arguments that have defaults", () => {
-        util_1.assertResult(util_1.compare("function a(a = 22){return a + 10}; a() + a(33);"));
+    it("should call functions with arguments that have defaults", async () => {
+        util_1.assertResult(await util_1.compare("function fn(a = 22){return a + 10}; fn() + fn(33);"));
     });
-    it("should call functions with arguments", () => {
-        util_1.assertResult(util_1.compare("function a(a,b){return a+b}; a(2,5) === 7;"));
+    it("should call functions with arguments", async () => {
+        util_1.assertResult(await util_1.compare("function a(a,b){return a+b}; a(2,5) === 7;"));
     });
-    it("should allow reference to arguments special variable", () => {
-        util_1.assertResult(util_1.compare("function a(b){return arguments[0] + 10}; a(33);"));
+    it("should allow reference to arguments special variable", async () => {
+        util_1.assertResult(await util_1.compare("function a(b){return arguments[0] + 10}; a(33);"));
     });
-    it("should access appropriate context", () => {
-        util_1.assertResult(util_1.compare(`
+    it("should access appropriate context", async () => {
+        util_1.assertResult(await util_1.compare(`
     var c = {
       expected: "hello",
       test: function(actual) {
@@ -36,7 +36,7 @@ describe("Functions", () => {
     };
     c.test("hello") === true;
     `));
-        util_1.assertResult(util_1.compare(`
+        util_1.assertResult(await util_1.compare(`
     var c = {
       expected: "hello",
       test: function(actual) {
@@ -50,14 +50,14 @@ describe("Functions", () => {
     b.test('on b') === true;
     `));
     });
-    it("should store and execute function expressions", () => {
-        util_1.assertResult(util_1.compare("let a = function(){return 2}; a();"));
+    it("should store and execute function expressions", async () => {
+        util_1.assertResult(await util_1.compare("let a = function(){return 2}; a();"));
     });
-    it("should return from sub statements", () => {
-        util_1.assertResult(util_1.compare("function a() { if (true) return 'in branch'; return 'should not get here'}; a();"));
+    it("should return from sub statements", async () => {
+        util_1.assertResult(await util_1.compare("function a() { if (true) return 'in branch'; return 'should not get here'}; a();"));
     });
-    it("should return from sub blocks", () => {
-        util_1.assertResult(util_1.compare(`
+    it("should return from sub blocks", async () => {
+        util_1.assertResult(await util_1.compare(`
 
     function _isSameValue(a, b) {
       if (a === b) {
@@ -74,14 +74,14 @@ describe("Functions", () => {
     });
 });
 describe("Getters/Setters", () => {
-    it("should define getters", () => {
-        util_1.assertResult(util_1.compare("let a = { get b() {return 2} }; a.b;"));
+    it("should define getters", async () => {
+        util_1.assertResult(await util_1.compare("let a = { get b() {return 2} }; a.b;"));
     });
-    it("should define setters", () => {
-        util_1.assertResult(util_1.compare("let a = { set b(c) {this._b = c} }; a.b = 22; a._b"));
+    it("should define setters", async () => {
+        util_1.assertResult(await util_1.compare("let holder = { set property(argument) {this._secretProp = argument} }; holder.property = 22; holder._secretProp"));
     });
-    it("should define both", () => {
-        util_1.assertResult(util_1.compare("let a = { set b(c) {this._b = c + 10}, get b(){return this._b} }; a.b = 22; a.b"));
+    it.only("should define both", async () => {
+        util_1.assertResult(await util_1.compare("let a = { set b(c) {this._b = c + 10}, get b(){return this._b} }; a.b = 22; a.b"));
     });
 });
 //# sourceMappingURL=functions.test.js.map

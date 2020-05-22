@@ -1,7 +1,17 @@
+import { Node, Statement, Expression } from 'shift-ast';
+import { BlockType } from './types';
 
-import { Statement, Expression } from 'shift-ast';
-
-export function isStatement(node: Statement | Expression): node is Statement {
+export function isStatement(node: Node): node is Statement {
   return node.type.match(/Statement/) || node.type.match('Declaration') ? true : false;
 }
 
+export function isBlockType(node: Node): node is BlockType {
+  switch (node.type) {
+    case 'Script':
+    case 'FunctionBody':
+    case 'Block':
+      return true;
+    default:
+      return false;
+  }
+}

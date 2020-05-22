@@ -1,20 +1,19 @@
-import { Node, ArrayBinding, AssignmentTargetIdentifier, BindingIdentifier, BindingWithDefault, Block, ClassDeclaration, DoWhileStatement, Expression, ForInStatement, ForOfStatement, ForStatement, FunctionBody, FunctionDeclaration, IdentifierExpression, ObjectBinding, Script, Statement, Super, VariableDeclaration, VariableDeclarationStatement, WhileStatement, FunctionExpression, Method, Getter, Setter, ArrowExpression, ExpressionStatement } from 'shift-ast';
+import chalk from 'chalk';
+import { ArrayBinding, BindingIdentifier, BindingWithDefault, Expression, Node, ObjectBinding, Script, Statement, Super, VariableDeclaration, VariableDeclarationStatement } from 'shift-ast';
+import * as codegen from 'shift-printer';
 import shiftScope, { ScopeLookup } from 'shift-scope';
-import { ReturnValueWithState } from './return-value';
 import { InterpreterContext } from './context';
 import { InterpreterRuntimeError } from './errors';
 import { NodeHandler } from './node-handler';
-import { isStatement } from './util';
-import * as codegen from 'shift-printer';
-import chalk from 'chalk';
+import { ReturnValueWithState } from './return-value';
+import { BlockType, FrameNode, FuncType, Identifier, Loop } from './types';
+import { isStatement, isBlockType } from './util';
+import DEBUG from 'debug';
+import { ExecutionFrame } from './ExecutionFrame';
+import { ExecutionPointer } from './ExecutionPointer';
 
-export type Identifier = BindingIdentifier | IdentifierExpression | AssignmentTargetIdentifier;
-
-type Loop = ForStatement | WhileStatement | ForOfStatement | ForInStatement | DoWhileStatement;
-
-type BlockType = Script | Block | FunctionBody;
-
-type FuncType = FunctionDeclaration | FunctionExpression | Method | Getter | Setter;
+const debug = DEBUG('shift:interpreter');
+export const debugFrame = debug.extend('frame');
 
 interface Options {
   skipUnsupported?: boolean;
@@ -22,6 +21,12 @@ interface Options {
 }
 
 export class Interpreter {
+  getNextExecutionPointer(): any {
+    throw new Error("Method not implemented.");
+  }
+  getExecutionPointer() {
+    throw new Error("Method not implemented.");
+  }
   contexts: InterpreterContext[] = [{}];
   globalScope: any;
   scopeLookup: any;
@@ -29,11 +34,13 @@ export class Interpreter {
   options: Options;
   currentScript?: Script;
   handler: NodeHandler;
+  pointer = new ExecutionPointer;
 
   argumentsMap = new WeakMap();
   currentLoops: Loop[] = [];
   currentNode?: Node;
   currentStatement?: Statement;
+  currentFrame?: ExecutionFrame;
 
   constructor(options: Options = {}) {
     this.options = options;
@@ -61,8 +68,8 @@ export class Interpreter {
   popContext() {
     return this.contexts.pop();
   }
-  evaluate(passedNode?: Script | Statement | Expression) {
-    let nodeToEvaluate: Script | Statement | Expression | undefined = undefined;
+  async run(passedNode?: FrameNode) {
+    let nodeToEvaluate: FrameNode | undefined = undefined;
 
     if (passedNode) {
       if (passedNode.type === 'Script') {
@@ -86,13 +93,10 @@ export class Interpreter {
     }
 
     try {
-      if (nodeToEvaluate.type === 'Script') {
-        return this.evaluateBlock(nodeToEvaluate).value;
-      } else if (isStatement(nodeToEvaluate)) {
-        return this.evaluateStatement(nodeToEvaluate);
-      } else {
-        return this.evaluateExpression(nodeToEvaluate);
-      }
+      const returnValue = await this.evaluateNext(nodeToEvaluate);
+      const result = (returnValue instanceof ReturnValueWithState) ? returnValue.value : returnValue;
+      debug(`completing run with result: ${result}`);
+      return result;
     } catch (e) {
       const statementSrc = codegen.printSummary(this.currentStatement);
       const currentNodeSrc = codegen.printSummary(this.currentNode);
@@ -100,9 +104,20 @@ export class Interpreter {
       throw e;
     }
   }
-  evaluateToFirstError(passedNode?: Script | Statement | Expression) {
+
+  async evaluateFrame(frame: ExecutionFrame) {
+    if (isBlockType(frame.node)) {
+      return this.evaluateBlock(frame.node);
+    } else if (isStatement(frame.node)) {
+      return this.evaluateStatement(frame.node);
+    } else {
+      return this.evaluateExpression(frame.node);
+    }
+  }
+
+  runToFirstError(passedNode?: Script | Statement | Expression) {
     try {
-      this.evaluate(passedNode);
+      return this.run(passedNode);
     } catch {
 
     }
@@ -110,55 +125,66 @@ export class Interpreter {
   step() {
     throw new Error("Method not implemented.");
   }
-  evaluateBlock(block: BlockType): ReturnValueWithState {
+  async evaluateBlock(block: BlockType): Promise<ReturnValueWithState> {
     let value;
     let didBreak = false;
     let didContinue = false;
     let didReturn = false;
+    const _debug = debug.extend('evaluateBlock');
+    _debug(`evaluating ${block.type} statements`);
 
     // Hoist function declarations.
     const functions = block.statements.filter(s => s.type === 'FunctionDeclaration');
-    functions.forEach(fnDecl => {
-      this.evaluateStatement(fnDecl);
-    })
+    for (let fnDecl of functions) {
+      await this.evaluateNext(fnDecl);
+    }
 
     const vars = block.statements
       .filter(<(T: Statement) => T is VariableDeclarationStatement>(stmt => stmt.type === 'VariableDeclarationStatement'))
       .filter((decl:VariableDeclarationStatement) => decl.declaration.kind === 'var');
-    vars.forEach(varDecl => {
-      this.hoistVars(varDecl);
-    })
+    for (let varDecl of vars) {
+      await this.hoistVars(varDecl);
+    }
 
     for (let i = 0; i < block.statements.length; i++) {
       const statement = block.statements[i];
       if (statement.type === 'BreakStatement') {
+        _debug(`break found in block`)
         didBreak = true;
         break;
       }
       if (statement.type === 'ContinueStatement') {
+        _debug(`continue found in block`)
         didContinue = true;
         break;
       }
       // skip over functions we've already declared above
-      if (statement.type === 'ReturnStatement') debugger;
       if (statement.type !== 'FunctionDeclaration') {
-        value = this.evaluateStatement(statement);
+          _debug(`Evaluating next ${statement.type} in ${block.type}`);
+          value = await this.evaluateNext(statement);
+          _debug(`${block.type} statement ${statement.type} completed`);
       }
       if (value instanceof ReturnValueWithState) {
-        if (value.didReturn) return value;
+        if (value.didReturn) {
+          _debug(`returning from block with value: ${value}`);
+          return value;
+        }
       }
       if (statement.type === 'ReturnStatement') {
+        _debug(`return found in block`);
         didReturn = true;
         break;
       }
     }
+    _debug(`completed ${block.type}, returning with: ${value}`);
     return new ReturnValueWithState(value, {didBreak, didContinue, didReturn});
   }
-  hoistVars(varDecl: VariableDeclarationStatement) {
-    varDecl.declaration.declarators.forEach(declarator => {
-      this.bindVariable(declarator.binding, undefined);
-    })
+  async hoistVars(varDecl: VariableDeclarationStatement) {
+    for (let declarator of varDecl.declaration.declarators) {
+      await this.bindVariable(declarator.binding, undefined);
+    }
   }
+
   evaluateStatement(stmt: Statement): ReturnValueWithState | any | void {
     if (!this.contexts) return;
     this.currentNode = stmt;
@@ -166,68 +192,85 @@ export class Interpreter {
     return this.handler[stmt.type](stmt);    
   }
 
-  declareVariables(decl: VariableDeclaration) {
-    decl.declarators.forEach(declarator => {
+  async declareVariables(decl: VariableDeclaration) {
+    for (let declarator of decl.declarators) {
       this.currentNode = declarator;
-      return this.handler.VariableDeclarator(declarator)
-    });
+      await this.handler.VariableDeclarator(declarator)
+    }
   }
 
-  createFunction(fn: FuncType) {
+  async createFunction(fn: FuncType) {
+    const _debug = debug.extend('createFunction');
     let name: string | undefined = undefined;
     if (fn.name) {
       switch (fn.name.type) {
         case 'BindingIdentifier':
           name = fn.name.name;
           break;
-        case 'ComputedPropertyName':
-          name = this.evaluateExpression(fn.name.expression);
+          case 'ComputedPropertyName':
+            name = await this.evaluateNext(fn.name.expression);
           break;
         case 'StaticPropertyName':
           name = fn.name.value;
       }
     }
 
+    _debug(`creating intermediary function ${name}`)
+
     const interpreter = this;
 
+    const fnDebug = debug.extend('function');
     if (name) {
-      return ({[name]:function(this: any, ...args:any) {
+      return ({[name]:async function(this: any, ...args:any) {
+        fnDebug(`calling intermediary function ${name}()`)
         interpreter.pushContext(this);
         interpreter.argumentsMap.set(this, arguments);
         if (fn.type === 'Getter') {
           // TODO need anything here?
         } else if(fn.type === 'Setter') {
-          interpreter.bindVariable(fn.param, args[0]);
+          fnDebug(`setter: binding passed parameter`);
+          await interpreter.bindVariable(fn.param, args[0]);
         } else {
-          fn.params.items.forEach((param, i) => {
-            interpreter.bindVariable(param, args[i]);
-          });
+          for (let i = 0; i < fn.params.items.length; i++) {
+            let param = fn.params.items[i];
+            fnDebug(`binding function argument ${i + 1}`);
+            await interpreter.bindVariable(param, args[i]);
+          }
         }
-        const blockResult = interpreter.evaluateBlock(fn.body);
+        fnDebug('evaluating function body');
+        const blockResult = await interpreter.evaluateNext(fn.body);
+        fnDebug('completed evaluating function body');
         interpreter.popContext();
         return blockResult.value;
       }})[name];
     } else {
-      return function(this: any, ...args:any) {
+      return async function(this: any, ...args:any) {
+        fnDebug(`calling intermediary function ${name}()`)
         interpreter.pushContext(this);
         interpreter.argumentsMap.set(this, arguments);
         if (fn.type === 'Getter') {
           // TODO need anything here?
         } else if(fn.type === 'Setter') {
-          interpreter.bindVariable(fn.param, args[0]);
+          fnDebug(`binding passed setter value`);
+          await interpreter.bindVariable(fn.param, args[0]);
         } else {
-          fn.params.items.forEach((param, i) => {
-            interpreter.bindVariable(param, args[i]);
-          });
+          for (let i = 0; i < fn.params.items.length; i++) {
+            let param = fn.params.items[i];
+            fnDebug(`binding function argument ${i + 1}`);
+            await interpreter.bindVariable(param, args[i]);
+          }
         }
-        const blockResult = interpreter.evaluateBlock(fn.body);
+        fnDebug('evaluating function body');
+        const blockResult = await interpreter.evaluateNext(fn.body);
         interpreter.popContext();
         return blockResult.value;
       };
     }
   }
 
-  bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
+  async bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
+    const _debug = debug.extend('bindVariable');
+    _debug(`${binding.type} => ${init}`);
     switch (binding.type) {
       case 'BindingIdentifier':
         {
@@ -235,41 +278,50 @@ export class Interpreter {
 
           if (variables.length > 1) throw new Error('reproduce this and handle it better');
           const variable = variables[0];
+          _debug(`binding ${binding.name} to ${init}`);
           this.variableMap.set(variable, init);
         }
         break;
       case 'ArrayBinding':
         {
-          binding.elements.forEach((el, i) => {
-            if (el) this.bindVariable(el, init[i]);
-          });
+          for (let i = 0; i < binding.elements.length; i++) {
+            const el = binding.elements[i];
+            if (el) await this.bindVariable(el, init[i]);
+          }
           if (binding.rest) this.skipOrThrow('ArrayBinding->Rest/Spread');
         }
         break;
       case 'ObjectBinding':
         {
-          binding.properties.forEach(prop => {
+          for (let i = 0; i < binding.properties.length; i++) {
+            const prop = binding.properties[i];
             if (prop.type === 'BindingPropertyIdentifier') {
               const name = prop.binding.name;
               if (init[name] === undefined && prop.init) {
-                this.bindVariable(prop.binding, this.evaluateExpression(prop.init));
+                await this.bindVariable(prop.binding, await this.evaluateNext(prop.init));
               } else {
-                this.bindVariable(prop.binding, init[name]);
+                await this.bindVariable(prop.binding, init[name]);
               }
             } else {
               const name =
                 prop.name.type === 'ComputedPropertyName'
-                  ? this.evaluateExpression(prop.name.expression)
+                  ? await this.evaluateNext(prop.name.expression)
                   : prop.name.value;
-              this.bindVariable(prop.binding, init[name]);
+              await this.bindVariable(prop.binding, init[name]);
             }
-          });
+          }
           if (binding.rest) this.skipOrThrow('ObjectBinding->Rest/Spread');
         }
         break;
       case 'BindingWithDefault':
-        if (init === undefined) this.bindVariable(binding.binding, this.evaluateExpression(binding.init));
-        else this.bindVariable(binding.binding, init);
+        if (init === undefined) {
+          _debug(`evaluating default for undefined argument`)
+          const defaults = await this.evaluateNext(binding.init)
+          _debug(`binding default`)
+          await this.bindVariable(binding.binding, defaults);
+        } else {
+          await this.bindVariable(binding.binding, init);
+        }
         break;
     }
   }
@@ -282,13 +334,18 @@ export class Interpreter {
     return value;
   }
   getVariableValue(node: Identifier): any {
+    const _debug = debug.extend('getVariableValue');
+    _debug(`retrieving value for ${node.name}`);
     const variables = this.scopeLookup.get(node);
 
     if (!variables) {
       throw new Error(`${node.type} variable not found. Make sure you are passing a valid Identifier node.`);
     }
 
-    if (variables.length > 1) throw new Error('reproduce this and handle it better');
+    if (variables.length > 1) {
+      _debug(`>1 variable returned, ${variables}`);
+      throw new Error('reproduce this and handle it better');
+    }
     const variable = variables[0];
 
     if (this.variableMap.has(variable)) {
@@ -307,6 +364,14 @@ export class Interpreter {
   }
   getCurrentContext() {
     return this.contexts[this.contexts.length - 1];
+  }
+  async evaluateNext(node:FrameNode | null) {
+    if (node === null) {
+      return null;
+    } else {
+      const frame = await this.pointer.queueAndWait(node);
+      return this.evaluateFrame(frame);
+    }
   }
   evaluateExpression(expr: Expression | Super | null): any {
     // This might be incorrect behavior ¯\_(ツ)_/¯

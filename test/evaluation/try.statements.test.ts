@@ -1,14 +1,14 @@
 import { compare, assertResult } from "../util";
 
 describe("Try/Catch", () => {
-  it("should catch errors", () => {
-    assertResult(compare(`let msg = ''; try{ throw new Error('err') } catch(e) {msg = e.message} msg`, {Error}))
+  it("should catch errors", async () => {
+    assertResult(await compare(`let msg = ''; try{ throw new Error('err') } catch(e) {msg = e.message} msg`, {Error}))
   });
-  it("should allow rethrowing", () => {
-    assertResult(compare(`try{ throw new Error('err') } catch(e) {throw e}`, {Error}))
+  it("should allow rethrowing", async () => {
+    assertResult(await compare(`try{ throw new Error('err') } catch(e) {throw e}`, {Error}))
   });
-  it('should return from catch', () => {
-    assertResult(compare(`
+  it('should return from catch', async () => {
+    assertResult(await compare(`
     let assert = {};
     function assertThrows(expectedErrorConstructor, func) {
       try {
@@ -28,7 +28,7 @@ describe("Try/Catch", () => {
   })
 });
 describe("Try/Finally", () => {
-  it("should catch errors", () => {
-    assertResult(compare(`let msg = ''; try{ throw new Error('err') } catch(e) {msg = e.message} finally {msg+='finally'} msg`, {Error}))
+  it("should catch errors", async () => {
+    assertResult(await compare(`let msg = ''; try{ throw new Error('err') } catch(e) {msg = e.message} finally {msg+='finally'} msg`, {Error}))
   });
 });

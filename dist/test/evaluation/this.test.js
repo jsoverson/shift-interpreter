@@ -8,10 +8,10 @@ const chai_spies_1 = __importDefault(require("chai-spies"));
 const util_1 = require("../util");
 chai_1.default.use(chai_spies_1.default);
 describe("this", () => {
-    it("should refer to local context", () => {
+    it("should refer to local context", async () => {
         const context = { global: {}, console };
         context.global = context;
-        util_1.assertResult(util_1.compare(`
+        util_1.assertResult(await util_1.compare(`
       const c = {
         a : function() {return this.b},
         b : "Hello"
@@ -19,10 +19,10 @@ describe("this", () => {
       c.a();
     `));
     });
-    it("should support dynamic context", () => {
+    it("should support dynamic context", async () => {
         const context = { global: {}, console };
         context.global = context;
-        util_1.assertResult(util_1.compare(`
+        util_1.assertResult(await util_1.compare(`
     const outer = {
       inner: {
         innerFn() {

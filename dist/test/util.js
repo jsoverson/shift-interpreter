@@ -27,7 +27,7 @@ function assertError(src, error) {
         expected = e.message;
     }
     try {
-        interpreter.evaluate(shift_parser_1.parseScript(src));
+        interpreter.run(shift_parser_1.parseScript(src));
     }
     catch (e) {
         actual = e.message;
@@ -39,7 +39,7 @@ function assertError(src, error) {
     chai_1.expect(actual).to.equal(expected);
 }
 exports.assertError = assertError;
-function compare(src, context) {
+async function compare(src, context) {
     const interpreter = new interpreter_1.Interpreter();
     if (context)
         interpreter.pushContext(context);
@@ -53,7 +53,7 @@ function compare(src, context) {
     }
     let interpreterActualValue, interpreterActualError;
     try {
-        interpreterActualValue = interpreter.evaluate(shift_parser_1.parseScript(src));
+        interpreterActualValue = await interpreter.run(shift_parser_1.parseScript(src));
     }
     catch (e) {
         interpreterActualError = e;

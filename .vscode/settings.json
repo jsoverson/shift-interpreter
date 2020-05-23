@@ -1,0 +1,6 @@
+{
+  "mochaExplorer.debuggerConfig":"Debug Mocha Tests",
+  "mochaExplorer.env": {
+    "DEBUG": "shift:interpreter:*"
+  }
+}

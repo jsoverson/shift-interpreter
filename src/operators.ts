@@ -1,3 +1,10 @@
+import { RuntimeValue } from "./runtime-value";
+
+function deconstruct(rv: any): any {
+  if (rv instanceof RuntimeValue) return rv.unwrap();
+  else return rv;
+}
+
 export const binaryOperatorMap = new Map<string, any>([
   ['+', (l: any, r: any) => l + r],
   ['-', (l: any, r: any) => l - r],

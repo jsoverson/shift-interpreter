@@ -4,6 +4,7 @@ import { Interpreter } from "../src/interpreter";
 import { InterpreterContext } from "../src/context";
 
 import DEBUG from "debug";
+import { RuntimeValue } from "../src";
 
 const debug = DEBUG('shift:interpreter:test');
 
@@ -62,7 +63,7 @@ export async function compare(src: string, context?: InterpreterContext): Promis
   }
   let interpreterActualValue, interpreterActualError;
   try {
-    interpreterActualValue = await interpreter.run(parseScript(src));
+    interpreterActualValue = RuntimeValue.unwrap(await interpreter.run(parseScript(src)));
   } catch (e) {
     interpreterActualError = e;
   }

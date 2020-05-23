@@ -14,4 +14,4 @@ export function interpretTree(tree: Script, context = {}) {
 export const interpret = interpretSource;
 
 export { Interpreter } from './interpreter';
-export { ReturnValueWithState } from './return-value';
+export { RuntimeValue } from './runtime-value';

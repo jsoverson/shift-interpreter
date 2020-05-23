@@ -7,12 +7,14 @@ describe("Variables", () => {
   it("should update values", async () => {
     assertResult(await compare('let a = 2; a = 3; a;'))
   });
-  it("should update values", async () => {
+  it("should update and retrieve in one statement", async () => {
     assertResult(await compare('let a = 2; a = a + 2; a;'))
   });
 
   it("decltype-less assignments should assign a global", async () => {
-    assertResult(await compare('function a() { b = 2; } a(); b'))
+    const context = {};
+    assertResult(await compare('function a() { b = 2; } a(); b', context))
+    console.log(context);
     // @ts-ignore
     delete global.b;
   });

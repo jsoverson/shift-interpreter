@@ -42,16 +42,16 @@ import {
 import { InterpreterRuntimeError } from './errors';
 import { Interpreter } from './interpreter';
 import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } from './operators';
-import { ReturnValueWithState } from './return-value';
 import { InterpreterContext } from './context';
-import { Identifier } from './types';
 import DEBUG from 'debug';
+import { RuntimeValue } from './runtime-value';
+import { isIntermediaryFunction, isGetterInternal } from './util';
 
 export interface DynamicClass {
   [key: string]: any;
 }
 
-const debug =  DEBUG('shift:interpreter:node-handler');
+const debug = DEBUG('shift:interpreter:node-handler');
 
 export class NodeHandler {
   interpreter: Interpreter;
@@ -62,7 +62,7 @@ export class NodeHandler {
 
   async ReturnStatement(stmt: ReturnStatement) {
     const value = await this.interpreter.evaluateNext(stmt.expression);
-    return new ReturnValueWithState(value, { didReturn: true });
+    return new RuntimeValue(value.unwrap(), { didReturn: true });
   }
 
   async ExpressionStatement(stmt: ExpressionStatement) {
@@ -74,7 +74,7 @@ export class NodeHandler {
 
   async VariableDeclarator(declarator: VariableDeclarator) {
     const value = await this.interpreter.evaluateNext(declarator.init);
-    return await this.interpreter.bindVariable(declarator.binding, value);
+    return this.interpreter.bindVariable(declarator.binding, value);
   }
 
   async FunctionDeclaration(decl: FunctionDeclaration) {
@@ -83,7 +83,7 @@ export class NodeHandler {
     if (variables.length > 1) throw new Error('reproduce this and handle it better');
     const variable = variables[0];
 
-    const fn = this.interpreter.createFunction(decl);
+    const fn = await this.interpreter.createFunction(decl);
 
     this.interpreter.variableMap.set(variable, fn);
   }
@@ -116,7 +116,7 @@ export class NodeHandler {
     let Class: DynamicClass = class {};
 
     if (decl.super) {
-      const xtends = await this.interpreter.evaluateNext(decl.super);
+      const xtends = RuntimeValue.unwrap(await this.interpreter.evaluateNext(decl.super));
       Class = ((SuperClass: any = xtends) => {
         if (constructor === null) {
           class InterpreterClassWithExtendsA extends SuperClass {
@@ -174,33 +174,30 @@ export class NodeHandler {
 
   async IfStatement(stmt: IfStatement) {
     const test = await this.interpreter.evaluateNext(stmt.test);
-    if (test) return this.interpreter.evaluateNext(stmt.consequent);
+    if (test.unwrap()) return this.interpreter.evaluateNext(stmt.consequent);
     else if (stmt.alternate) return this.interpreter.evaluateNext(stmt.alternate);
   }
 
   async ConditionalExpression(stmt: ConditionalExpression) {
     const test = await this.interpreter.evaluateNext(stmt.test);
-    if (test) return this.interpreter.evaluateNext(stmt.consequent);
+    if (test.unwrap()) return this.interpreter.evaluateNext(stmt.consequent);
     else if (stmt.alternate) return this.interpreter.evaluateNext(stmt.alternate);
   }
 
   async ThrowStatement(stmt: ThrowStatement) {
-    throw await this.interpreter.evaluateNext(stmt.expression);
+    const error = await this.interpreter.evaluateNext(stmt.expression);
+    throw error.unwrap();
   }
 
   async TryCatchStatement(stmt: TryCatchStatement) {
     let returnValue = undefined;
     try {
       returnValue = await this.interpreter.evaluateNext(stmt.body);
-      if (returnValue instanceof ReturnValueWithState) {
-        if (returnValue.didReturn) return returnValue;
-      }
+      if (returnValue.didReturn) return returnValue;
     } catch (e) {
       await this.interpreter.bindVariable(stmt.catchClause.binding, e);
       returnValue = await this.interpreter.evaluateNext(stmt.catchClause.body);
-      if (returnValue instanceof ReturnValueWithState) {
-        if (returnValue.didReturn) return returnValue;
-      }
+      if (returnValue.didReturn) return returnValue;
     }
     return returnValue;
   }
@@ -210,32 +207,22 @@ export class NodeHandler {
     if (stmt.catchClause) {
       try {
         returnValue = await this.interpreter.evaluateNext(stmt.body);
-        if (returnValue instanceof ReturnValueWithState) {
-          if (returnValue.didReturn) return returnValue;
-        }
+        if (returnValue.didReturn) return returnValue;
       } catch (e) {
         await this.interpreter.bindVariable(stmt.catchClause.binding, e);
         returnValue = await this.interpreter.evaluateNext(stmt.catchClause.body);
-        if (returnValue instanceof ReturnValueWithState) {
-          if (returnValue.didReturn) return returnValue;
-        }
+        if (returnValue.didReturn) return returnValue;
       } finally {
         returnValue = await this.interpreter.evaluateNext(stmt.finalizer);
-        if (returnValue instanceof ReturnValueWithState) {
-          if (returnValue.didReturn) return returnValue;
-        }
+        if (returnValue.didReturn) return returnValue;
       }
     } else {
       try {
         returnValue = await this.interpreter.evaluateNext(stmt.body);
-        if (returnValue instanceof ReturnValueWithState) {
-          if (returnValue.didReturn) return returnValue;
-        }
+        if (returnValue.didReturn) return returnValue;
       } finally {
         returnValue = await this.interpreter.evaluateNext(stmt.finalizer);
-        if (returnValue instanceof ReturnValueWithState) {
-          if (returnValue.didReturn) return returnValue;
-        }
+        if (returnValue.didReturn) return returnValue;
       }
     }
     return returnValue;
@@ -243,7 +230,7 @@ export class NodeHandler {
 
   async ForOfStatement(stmt: ForOfStatement) {
     this.interpreter.currentLoops.push(stmt);
-    const iterationExpression = await this.interpreter.evaluateNext(stmt.right);
+    const iterationExpression = (await this.interpreter.evaluateNext(stmt.right)).unwrap();
     function* nextValue() {
       yield* iterationExpression;
     }
@@ -276,7 +263,7 @@ export class NodeHandler {
       case 'VariableDeclaration': {
         await this.interpreter.declareVariables(stmt.left);
         const binding = stmt.left.declarators[0].binding;
-        for (let a in iterationExpression) {
+        for (let a in iterationExpression.unwrap()) {
           if (binding.type === 'BindingIdentifier') this.interpreter.updateVariableValue(binding, a);
           else this.interpreter.skipOrThrow(stmt.type + '.left->' + binding.type);
           await this.interpreter.evaluateNext(stmt.body);
@@ -294,7 +281,7 @@ export class NodeHandler {
       if (stmt.init.type === 'VariableDeclaration') await this.interpreter.declareVariables(stmt.init);
       else await this.interpreter.evaluateNext(stmt.init);
     }
-    while (await this.interpreter.evaluateNext(stmt.test)) {
+    while (RuntimeValue.unwrap(await this.interpreter.evaluateNext(stmt.test))) {
       if (stmt.body.type === 'BlockStatement') {
         const blockResult = await this.interpreter.evaluateNext(stmt.body.block);
         if (blockResult.didBreak) break;
@@ -308,7 +295,7 @@ export class NodeHandler {
 
   async WhileStatement(stmt: WhileStatement) {
     this.interpreter.currentLoops.push(stmt);
-    while (await this.interpreter.evaluateNext(stmt.test)) {
+    while ((await this.interpreter.evaluateNext(stmt.test)).unwrap()) {
       if (stmt.body.type === 'BlockStatement') {
         const blockResult = await this.interpreter.evaluateNext(stmt.body.block);
         if (blockResult.didBreak) break;
@@ -328,7 +315,7 @@ export class NodeHandler {
       } else {
         await this.interpreter.evaluateNext(stmt.body);
       }
-    } while (await this.interpreter.evaluateNext(stmt.test));
+    } while ((await this.interpreter.evaluateNext(stmt.test)).unwrap());
     this.interpreter.currentLoops.pop();
   }
 
@@ -337,14 +324,14 @@ export class NodeHandler {
   }
 
   async NewExpression(expr: NewExpression) {
-    const ClassTarget = await this.interpreter.evaluateNext(expr.callee);
+    const ClassTarget = (await this.interpreter.evaluateNext(expr.callee)).unwrap();
     const args: any[] = [];
     for (let arg of expr.arguments) {
       if (arg.type === 'SpreadElement') {
-        const value = await this.interpreter.evaluateNext(arg.expression);
+        const value = (await this.interpreter.evaluateNext(arg.expression)).unwrap();
         args.push(...value);
       } else {
-        args.push(await this.interpreter.evaluateNext(arg));
+        args.push((await this.interpreter.evaluateNext(arg)).unwrap());
       }
     }
 
@@ -358,7 +345,7 @@ export class NodeHandler {
       if (el === null) {
         elements.push(null);
       } else if (el.type === 'SpreadElement') {
-        const iterable = await this.interpreter.evaluateNext(el.expression);
+        const iterable = (await this.interpreter.evaluateNext(el.expression)).unwrap();
         elements.push(...Array.from(iterable));
       } else {
         elements.push(await this.interpreter.evaluateNext(el));
@@ -383,29 +370,28 @@ export class NodeHandler {
           const name =
             prop.name.type === 'StaticPropertyName'
               ? prop.name.value
-              : await this.interpreter.evaluateNext(prop.name.expression);
-          obj[name] = await this.interpreter.evaluateNext(prop.expression);
+              : (await this.interpreter.evaluateNext(prop.name.expression)).unwrap();
+          obj[name] = (await this.interpreter.evaluateNext(prop.expression)).unwrap();
           break;
         }
         case 'Method': {
           const name =
             prop.name.type === 'StaticPropertyName'
               ? prop.name.value
-              : await this.interpreter.evaluateNext(prop.name.expression);
+              : (await this.interpreter.evaluateNext(prop.name.expression)).unwrap();
           obj[name] = await this.interpreter.createFunction(prop);
           break;
         }
         case 'ShorthandProperty': {
           const name = prop.name.name;
-          const value = this.interpreter.getVariableValue(prop.name);
-          obj[name] = value;
+          obj[name] = this.interpreter.getRuntimeValue(prop.name).unwrap();
           break;
         }
         case 'Getter': {
           const name =
             prop.name.type === 'StaticPropertyName'
               ? prop.name.value
-              : await this.interpreter.evaluateNext(prop.name.expression);
+              : (await this.interpreter.evaluateNext(prop.name.expression)).unwrap();
           const operations = getPropertyDescriptors(name);
           operations.set('get', await this.interpreter.createFunction(prop));
           break;
@@ -414,7 +400,7 @@ export class NodeHandler {
           const name =
             prop.name.type === 'StaticPropertyName'
               ? prop.name.value
-              : await this.interpreter.evaluateNext(prop.name.expression);
+              : (await this.interpreter.evaluateNext(prop.name.expression)).unwrap();
           const operations = getPropertyDescriptors(name);
           operations.set('set', await this.interpreter.createFunction(prop));
           break;
@@ -425,7 +411,7 @@ export class NodeHandler {
     }
 
     Array.from(batchOperations.entries()).forEach(([prop, ops]) => {
-      _debug(`setting object property ${prop} (setter:${ops.has('set')}, getter:${ops.has('get')})`)
+      _debug(`setting object property ${prop} (setter:${ops.has('set')}, getter:${ops.has('get')})`);
       const descriptor: PropertyDescriptor = {
         get: ops.get('get'),
         set: ops.get('set'),
@@ -439,17 +425,23 @@ export class NodeHandler {
 
   async StaticMemberExpression(expr: StaticMemberExpression) {
     if (expr.object.type === 'Super') return this.interpreter.skipOrThrow(expr.object.type);
-    const object = await this.interpreter.evaluateNext(expr.object);
-    const value = await object[expr.property];
-    return value;
+    const object = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.object));
+    let result = object[expr.property];
+    if (isGetterInternal(object, expr.property)) {
+      result = await result;
+    }
+    return RuntimeValue.wrap(result);
   }
 
   async ComputedMemberExpression(expr: ComputedMemberExpression) {
     if (expr.object.type === 'Super') return this.interpreter.skipOrThrow(expr.object.type);
-    const object = await this.interpreter.evaluateNext(expr.object);
-    const value = await object[await this.interpreter.evaluateNext(expr.expression)];
-    // if (typeof value === "function") return value.bind(object);
-    return value;
+    const object = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.object));
+    const property = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.expression));
+    let result = object[property];
+    if (isGetterInternal(object, property)) {
+      result = await result;
+    }
+    return RuntimeValue.wrap(result);
   }
 
   async CallExpression(expr: CallExpression) {
@@ -460,29 +452,38 @@ export class NodeHandler {
     for (let arg of expr.arguments) {
       if (arg.type === 'SpreadElement') {
         const value = await this.interpreter.evaluateNext(arg.expression);
-        args.push(...value);
+        args.push(...value.unwrap());
       } else {
-        args.push(await this.interpreter.evaluateNext(arg));
+        args.push(RuntimeValue.unwrap(await this.interpreter.evaluateNext(arg)));
       }
     }
 
     let context = this.interpreter.getCurrentContext();
     let fn = null;
     if (expr.callee.type === 'StaticMemberExpression') {
-      context = await this.interpreter.evaluateNext(expr.callee.object);
-      fn = context[expr.callee.property];
+      context = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.callee.object));
+      fn = RuntimeValue.unwrap(context[expr.callee.property]);
     } else if (expr.callee.type === 'ComputedMemberExpression') {
-      context = await this.interpreter.evaluateNext(expr.callee.object);
-      fn = context[await this.interpreter.evaluateNext(expr.callee.expression)];
+      context = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.callee.object));
+      const computedProperty = await this.interpreter.evaluateNext(expr.callee.expression);
+      fn = RuntimeValue.unwrap(context[computedProperty.unwrap()]);
     } else {
-      fn = await this.interpreter.evaluateNext(expr.callee);
+      fn = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.callee));
     }
 
     if (typeof fn === 'function') {
-      _debug('calling function');
-      const returnValue = await fn.apply(context, args);
-      _debug('function completed');
-      return returnValue;
+      let returnValue: RuntimeValue<any>;
+      if (fn._interp) {
+        // we have an interpreter-made function so the promise is ours.
+        _debug('calling interpreter function');
+        returnValue = await fn.apply(context, args);
+        _debug('interpreter function completed');
+      } else {
+        _debug('calling host function');
+        returnValue = fn.apply(context, args);
+        _debug('host function completed');
+      }
+      return RuntimeValue.wrap(returnValue);
     } else {
       throw new Error(`Can not execute non-function ${JSON.stringify(expr)}`);
     }
@@ -492,24 +493,25 @@ export class NodeHandler {
     const _debug = debug.extend('AssignmentExpression');
     switch (expr.binding.type) {
       case 'AssignmentTargetIdentifier':
-        _debug(`assigning ${expr.binding.name} new value`)
+        _debug(`assigning ${expr.binding.name} new value`);
         return this.interpreter.updateVariableValue(expr.binding, await this.interpreter.evaluateNext(expr.expression));
       case 'ComputedMemberAssignmentTarget': {
         const object = await this.interpreter.evaluateNext(expr.binding.object);
         const property = await this.interpreter.evaluateNext(expr.binding.expression);
         _debug(`evaluating expression ${expr.expression.type} to assign to ${property}`);
         const value = await this.interpreter.evaluateNext(expr.expression);
-        _debug(`assigning object property "${property}" new value`)
-        return (object[property] = value);
+        _debug(`assigning object property "${property}" new value`);
+        const result = (object.unwrap()[property.unwrap()] = value);
+        return result;
       }
       case 'StaticMemberAssignmentTarget': {
-        if (expr.binding.object.type === 'ThisExpression') debugger;
-         const object = await this.interpreter.evaluateNext(expr.binding.object);
+        const object = await this.interpreter.evaluateNext(expr.binding.object);
         const property = expr.binding.property;
-        _debug(`3: evaluating expression ${expr.expression.type} to assign to ${property}`);
-       const value = await this.interpreter.evaluateNext(expr.expression);
-        _debug(`4: assigning object property "${property}" new value`);
-        return await (object[property] = value);
+        _debug(`evaluating expression ${expr.expression.type} to assign to ${property}`);
+        const value = await this.interpreter.evaluateNext(expr.expression);
+        _debug(`assigning object property "${property}" new value`);
+        const result = (object.unwrap()[property] = value);
+        return result;
       }
       case 'ArrayAssignmentTarget':
       case 'ObjectAssignmentTarget':
@@ -521,7 +523,7 @@ export class NodeHandler {
   async UpdateExpression(expr: UpdateExpression) {
     switch (expr.operand.type) {
       case 'AssignmentTargetIdentifier': {
-        const currentValue = this.interpreter.getVariableValue(expr.operand);
+        const currentValue = this.interpreter.getRuntimeValue(expr.operand).unwrap();
         const nextValue = expr.operator === '++' ? currentValue + 1 : currentValue - 1;
         this.interpreter.updateVariableValue(expr.operand, nextValue);
         return expr.isPrefix ? nextValue : currentValue;
@@ -529,17 +531,17 @@ export class NodeHandler {
       case 'ComputedMemberAssignmentTarget': {
         const object = await this.interpreter.evaluateNext(expr.operand.object);
         const property = await this.interpreter.evaluateNext(expr.operand.expression);
-        const currentValue = object[property];
+        const currentValue = object.unwrap()[property.unwrap()];
         const nextValue = expr.operator === '++' ? currentValue + 1 : currentValue - 1;
-        object[property] = nextValue;
+        object.unwrap()[property.unwrap()] = nextValue;
         return expr.isPrefix ? nextValue : currentValue;
       }
       case 'StaticMemberAssignmentTarget': {
         const object = await this.interpreter.evaluateNext(expr.operand.object);
         const property = expr.operand.property;
-        const currentValue = object[property];
+        const currentValue = object.unwrap()[property];
         const nextValue = expr.operator === '++' ? currentValue + 1 : currentValue - 1;
-        object[property] = nextValue;
+        object.unwrap()[property] = nextValue;
         return expr.isPrefix ? nextValue : currentValue;
       }
       default:
@@ -551,23 +553,25 @@ export class NodeHandler {
     const operation = compoundAssignmentOperatorMap.get(expr.operator);
     switch (expr.binding.type) {
       case 'AssignmentTargetIdentifier': {
-        const currentValue = this.interpreter.getVariableValue(expr.binding);
-        return this.interpreter.updateVariableValue(
-          expr.binding,
-          operation(currentValue, await this.interpreter.evaluateNext(expr.expression)),
-        );
+        const currentValue = this.interpreter.getRuntimeValue(expr.binding).unwrap();
+        const newValue = await this.interpreter.evaluateNext(expr.expression);
+        return this.interpreter.updateVariableValue(expr.binding, operation(currentValue, newValue.unwrap()));
       }
       case 'ComputedMemberAssignmentTarget': {
-        const object = await this.interpreter.evaluateNext(expr.binding.object);
-        const property = await this.interpreter.evaluateNext(expr.binding.expression);
+        const object = (await this.interpreter.evaluateNext(expr.binding.object)).unwrap();
+        const property = (await this.interpreter.evaluateNext(expr.binding.expression)).unwrap();
         const currentValue = object[property];
-        return (object[property] = operation(currentValue, await this.interpreter.evaluateNext(expr.expression)));
+        const newValue = await this.interpreter.evaluateNext(expr.expression);
+        const result = (object[property] = operation(currentValue, newValue.unwrap()));
+        return result;
       }
       case 'StaticMemberAssignmentTarget': {
-        const object = await this.interpreter.evaluateNext(expr.binding.object);
+        const object = (await this.interpreter.evaluateNext(expr.binding.object)).unwrap();
         const property = expr.binding.property;
         const currentValue = object[property];
-        return (object[property] = operation(currentValue, await this.interpreter.evaluateNext(expr.expression)));
+        const newValue = await this.interpreter.evaluateNext(expr.expression);
+        const result = (object[property] = operation(currentValue, newValue.unwrap()));
+        return result;
       }
       default:
         return;
@@ -592,7 +596,7 @@ export class NodeHandler {
       if (el.type === 'TemplateElement') {
         parts.push(el.rawValue);
       } else {
-        parts.push(await this.interpreter.evaluateNext(el));
+        parts.push(RuntimeValue.unwrap(await this.interpreter.evaluateNext(el)));
       }
     }
     return parts.join('');
@@ -602,7 +606,7 @@ export class NodeHandler {
     const interpreter = this.interpreter;
 
     return function(this: InterpreterContext) {
-      return async (...args: any) => {
+      const arrowFn = async (...args: any) => {
         interpreter.pushContext(this);
         for (let i = 0; i < expr.params.items.length; i++) {
           let param = expr.params.items[i];
@@ -618,13 +622,15 @@ export class NodeHandler {
         interpreter.popContext();
         return returnValue;
       };
+      Object.assign(arrowFn, { _interp: true });
+      return arrowFn;
     }.bind(interpreter.getCurrentContext())();
   }
   async FunctionExpression(expr: FunctionExpression) {
     return this.interpreter.createFunction(expr);
   }
   async IdentifierExpression(expr: IdentifierExpression) {
-    return this.interpreter.getVariableValue(expr);
+    return this.interpreter.getRuntimeValue(expr);
   }
   async LiteralNumericExpression(expr: LiteralNumericExpression) {
     return expr.value;
@@ -643,12 +649,15 @@ export class NodeHandler {
   }
   async BinaryExpression(expr: BinaryExpression) {
     const operation = binaryOperatorMap.get(expr.operator);
-    return operation!(await this.interpreter.evaluateNext(expr.left), await this.interpreter.evaluateNext(expr.right));
+    const left = await this.interpreter.evaluateNext(expr.left);
+    const right = await this.interpreter.evaluateNext(expr.right);
+    return operation(left.unwrap(), right.unwrap());
   }
   async UnaryExpression(expr: UnaryExpression) {
     const operation = unaryOperatorMap.get(expr.operator);
     if (!operation) return this.interpreter.skipOrThrow(`${expr.type} : ${expr.operator}`);
-    return operation!(await this.interpreter.evaluateNext(expr.operand));
+    const operand = await this.interpreter.evaluateNext(expr.operand);
+    return operation(operand.unwrap());
   }
 
   // TODO move any possible logic here.
@@ -673,7 +682,7 @@ export class NodeHandler {
     throw new InterpreterRuntimeError(`Unsupported node ${arguments[0].type}`);
   }
   async DebuggerStatement(...args: any) {
-    throw new InterpreterRuntimeError(`Unsupported node ${arguments[0].type}`);
+    debugger;
   }
   async NewTargetExpression(...args: any) {
     throw new InterpreterRuntimeError(`Unsupported node ${arguments[0].type}`);

@@ -2,8 +2,8 @@
 import chai from "chai";
 import { parseScript } from "shift-parser";
 import { Interpreter } from "../src";
-import { ExecutionPointer } from "../src/ExecutionPointer";
-import { ExecutionFrame } from "../src/ExecutionFrame";
+import { ExecutionPointer } from "../src/execution-pointer";
+import { ExecutionFrame } from "../src/execution-frame";
 import { LiteralBooleanExpression } from "shift-ast";
 
 describe("execution-pointer", () => {

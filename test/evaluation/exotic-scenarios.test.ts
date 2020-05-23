@@ -4,7 +4,7 @@ import { ExpressionStatement } from "shift-ast";
 import chai from 'chai';
 
 describe("ExoticScenarios", () => {
-  it("should allow piecemeal execution", () => {
+  it("should allow piecemeal execution", async () => {
     const source = `
     (function() {
       var c = {
@@ -61,13 +61,13 @@ describe("ExoticScenarios", () => {
     `;
     const tree = parseScript(source);
     const interpreter = new Interpreter();
-    interpreter.analyze(tree);
+    interpreter.load(tree);
     // @ts-ignore
-    interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
+    await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
     // @ts-ignore
-    interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0]);
+    await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0]);
     // @ts-ignore
-    const v = interpreter.getVariableValue(tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration.declarators[0].binding);
+    const v = interpreter.getRuntimeValue(tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration.declarators[0].binding).unwrap();
     chai.expect(v).to.deep.equal([ '3', '4', '2', '1', '0' ]);
 
   });

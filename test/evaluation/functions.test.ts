@@ -84,7 +84,7 @@ describe("Getters/Setters", () => {
   it("should define setters", async () => {
     assertResult(await compare("let holder = { set property(argument) {this._secretProp = argument} }; holder.property = 22; holder._secretProp"));
   });
-  it.only("should define both", async () => {
+  it("should define both", async () => {
     assertResult(await compare("let a = { set b(c) {this._b = c + 10}, get b(){return this._b} }; a.b = 22; a.b"));
   });
 });

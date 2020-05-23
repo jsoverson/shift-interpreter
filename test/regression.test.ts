@@ -1,26 +1,20 @@
 import chai from "chai";
 import { parseScript } from "shift-parser";
 import { Interpreter } from "../src";
+import { FunctionDeclaration } from "shift-ast";
 
 describe("regression", () => {
-  it("should not break on querying for function name", () => {
+  it("should hoist functions", async () => {
     const src = 'a.b = 2; function a(){}'
     const ast = parseScript(src);
     const interpreter = new Interpreter();
-    interpreter.analyze(ast);
-    const fnDecls = ast.statements.filter(st => st.type==='FunctionDeclaration');
-    fnDecls.forEach(fnDecl => interpreter.evaluateStatement(fnDecl));
-    for (let i = 0; i < ast.statements.length; i++) {
-      const stmt = ast.statements[i];
-      if (stmt.type === 'FunctionDeclaration') continue;
-      interpreter.evaluateStatement(stmt);
-    }
+    interpreter.load(ast);
+    await interpreter.run();
+    const fnDecl = ast.statements.find(st => st.type==='FunctionDeclaration') as FunctionDeclaration;
   
-    const fnDecl:any = ast.statements[1];
-    
     const fn = () => {
-      const value = interpreter.getVariableValue(fnDecl.name)
-      chai.expect(value.b).to.equal(2);
+      const value = interpreter.getRuntimeValue(fnDecl.name).unwrap();
+      chai.expect(value.b.unwrap()).to.equal(2);
     }
     chai.expect(fn).to.not.throw();
   });

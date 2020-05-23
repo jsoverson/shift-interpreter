@@ -19,6 +19,7 @@ const return_value_1 = require("./return-value");
 const util_1 = require("./util");
 const debug_1 = __importDefault(require("debug"));
 const ExecutionPointer_1 = require("./ExecutionPointer");
+const RuntimeValue_1 = require("./RuntimeValue");
 const debug = debug_1.default('shift:interpreter');
 exports.debugFrame = debug.extend('frame');
 class Interpreter {
@@ -268,7 +269,7 @@ class Interpreter {
                         throw new Error('reproduce this and handle it better');
                     const variable = variables[0];
                     _debug(`binding ${binding.name} to ${init}`);
-                    this.variableMap.set(variable, init);
+                    this.variableMap.set(variable, RuntimeValue_1.RuntimeValue.wrap(init));
                 }
                 break;
             case 'ArrayBinding':
@@ -324,7 +325,7 @@ class Interpreter {
         if (variables.length > 1)
             throw new Error('reproduce this and handle it better');
         const variable = variables[0];
-        this.variableMap.set(variable, value);
+        this.variableMap.set(variable, RuntimeValue_1.RuntimeValue.wrap(value));
         return value;
     }
     getVariableValue(node) {

@@ -15,3 +15,14 @@ export function isBlockType(node: Node): node is BlockType {
       return false;
   }
 }
+
+export function isIntermediaryFunction(fn: (...args: any) => any): boolean {
+  //@ts-ignore
+  return !!fn._interp
+}
+
+export function isGetterInternal(obj:any, prop:string) {
+  const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+  if (!descriptor) return false;
+  return descriptor.get && isIntermediaryFunction(descriptor.get);
+}

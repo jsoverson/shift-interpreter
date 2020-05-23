@@ -7,6 +7,7 @@ const errors_1 = require("./errors");
 const operators_1 = require("./operators");
 const return_value_1 = require("./return-value");
 const debug_1 = __importDefault(require("debug"));
+const RuntimeValue_1 = require("./RuntimeValue");
 const debug = debug_1.default('shift:interpreter:node-handler');
 class NodeHandler {
     constructor(interpreter) {
@@ -566,26 +567,26 @@ class NodeHandler {
             };
         }.bind(interpreter.getCurrentContext())();
     }
-    async FunctionExpression(expr) {
+    FunctionExpression(expr) {
         return this.interpreter.createFunction(expr);
     }
-    async IdentifierExpression(expr) {
+    IdentifierExpression(expr) {
         return this.interpreter.getVariableValue(expr);
     }
-    async LiteralNumericExpression(expr) {
-        return expr.value;
+    LiteralNumericExpression(expr) {
+        return RuntimeValue_1.RuntimeValue.wrap(expr.value);
     }
-    async LiteralStringExpression(expr) {
-        return expr.value;
+    LiteralStringExpression(expr) {
+        return RuntimeValue_1.RuntimeValue.wrap(expr.value);
     }
-    async LiteralBooleanExpression(expr) {
-        return expr.value;
+    LiteralBooleanExpression(expr) {
+        return RuntimeValue_1.RuntimeValue.wrap(expr.value);
     }
-    async LiteralInfinityExpression(expr) {
-        return 1 / 0;
+    LiteralInfinityExpression(expr) {
+        return RuntimeValue_1.RuntimeValue.wrap(1 / 0);
     }
-    async LiteralNullExpression(expr) {
-        return null;
+    LiteralNullExpression(expr) {
+        return RuntimeValue_1.RuntimeValue.wrap(null);
     }
     async BinaryExpression(expr) {
         const operation = operators_1.binaryOperatorMap.get(expr.operator);

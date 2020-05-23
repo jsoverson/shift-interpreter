@@ -5,6 +5,8 @@ describe("Objects", () => {
     //@ts-ignore
     const outer = global.outer = new Promise((res) => {res(22)});
     assertResult(await compare("let inner = this.outer; inner", {outer}));
+    //@ts-ignore
+    delete global.outer;
   });
   it("should evaluate object expressions and allow static member access", async () => {
     assertResult(await compare("let a = {b:2}; a.b;"));

@@ -9,5 +9,5 @@ export type BlockType = Script | Block | FunctionBody;
 
 export type FuncType = FunctionDeclaration | FunctionExpression | Method | Getter | Setter;
 
-export type FrameNode = Script | Statement | Expression | Super | BlockType | VariableDeclarator;
+export type InstructionNode = Script | Statement | Expression | Super | BlockType | VariableDeclarator;
 

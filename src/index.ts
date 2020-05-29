@@ -7,9 +7,13 @@ export function interpretSource(source: string, context = {}) {
 }
 
 export function interpretTree(tree: Script, context = {}) {
-  const interpreter = new Interpreter(context);
-  return interpreter.run(tree);
+  const interpreter = new Interpreter();
+  interpreter.load(tree);
+  interpreter.pushContext(context);
+  return interpreter.run();
 }
+
+export default interpretSource;
 
 export const interpret = interpretSource;
 

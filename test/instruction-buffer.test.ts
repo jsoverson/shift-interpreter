@@ -1,24 +1,23 @@
 
 import chai from "chai";
-import { parseScript } from "shift-parser";
-import { Interpreter } from "../src";
-import { ExecutionPointer } from "../src/execution-pointer";
-import { ExecutionFrame } from "../src/execution-frame";
 import { LiteralBooleanExpression } from "shift-ast";
+import { InstructionBuffer } from "../src/instruction-buffer";
 
-describe("execution-pointer", () => {
-  it("should maintain a stack of frames and responders", async() => {
-    const pointer = new ExecutionPointer;
+describe("instruction-buffer", () => {
+  it("should maintain a stack of instructions and responders", async() => {
+    const buffer = new InstructionBuffer;
     const nodeA = new LiteralBooleanExpression({value:true});
     const nodeB = new LiteralBooleanExpression({value:false});
     const order = [];
     async function next() {
       order.push(3)
-      await pointer.queueAndWait(nodeB);
+      buffer.add(nodeB);
+      await buffer.awaitExecution();
       order.push(4)
     }
     order.push(1);
-    await pointer.queueAndWait(nodeA);
+    buffer.add(nodeA);
+    await buffer.awaitExecution();
     order.push(2);
     await next();
     order.push(5)

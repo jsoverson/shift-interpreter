@@ -63,7 +63,10 @@ export async function compare(src: string, context?: InterpreterContext): Promis
   }
   let interpreterActualValue, interpreterActualError;
   try {
-    interpreterActualValue = RuntimeValue.unwrap(await interpreter.run(parseScript(src)));
+    interpreter.load(parseScript(src));
+    // const result = await interpreter.stepInteractive();
+    const result = await interpreter.run()
+    interpreterActualValue = RuntimeValue.unwrap(result);
   } catch (e) {
     interpreterActualError = e;
   }

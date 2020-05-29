@@ -45,7 +45,8 @@ import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } fr
 import { InterpreterContext } from './context';
 import DEBUG from 'debug';
 import { RuntimeValue } from './runtime-value';
-import { isIntermediaryFunction, isGetterInternal } from './util';
+import { isIntermediaryFunction, isGetterInternal, toString } from './util';
+import * as codegen from 'shift-printer';
 
 export interface DynamicClass {
   [key: string]: any;
@@ -85,7 +86,7 @@ export class NodeHandler {
 
     const fn = await this.interpreter.createFunction(decl);
 
-    this.interpreter.variableMap.set(variable, fn);
+    this.interpreter.variableMap.set(variable, RuntimeValue.wrap(fn));
   }
 
   async BlockStatement(stmt: BlockStatement) {
@@ -167,7 +168,7 @@ export class NodeHandler {
 
     const variables = this.interpreter.scopeLookup.get(decl.name);
 
-    variables.forEach((variable: any) => this.interpreter.variableMap.set(variable, Class));
+    variables.forEach((variable: any) => this.interpreter.variableMap.set(variable, RuntimeValue.wrap(Class)));
 
     return Class;
   }
@@ -324,7 +325,7 @@ export class NodeHandler {
   }
 
   async NewExpression(expr: NewExpression) {
-    const ClassTarget = (await this.interpreter.evaluateNext(expr.callee)).unwrap();
+    const newTarget = (await this.interpreter.evaluateNext(expr.callee)).unwrap();
     const args: any[] = [];
     for (let arg of expr.arguments) {
       if (arg.type === 'SpreadElement') {
@@ -334,9 +335,11 @@ export class NodeHandler {
         args.push((await this.interpreter.evaluateNext(arg)).unwrap());
       }
     }
-
-    this.interpreter.currentNode = expr;
-    return new ClassTarget(...args);
+    let result = new newTarget(...args);
+    if (isIntermediaryFunction(newTarget)) {
+      result = await result;
+    }
+    return result;
   }
 
   async ArrayExpression(expr: ArrayExpression) {
@@ -473,19 +476,20 @@ export class NodeHandler {
 
     if (typeof fn === 'function') {
       let returnValue: RuntimeValue<any>;
-      if (fn._interp) {
+      let modifiedCall = (fn === Function.prototype.call || fn === Function.prototype.apply) && isIntermediaryFunction(context);
+      if (fn._interp || modifiedCall) {
         // we have an interpreter-made function so the promise is ours.
-        _debug('calling interpreter function');
+        _debug(`calling interpreter function ${fn.name}`);
         returnValue = await fn.apply(context, args);
-        _debug('interpreter function completed');
+        _debug(`interpreter function completed ${fn.name}`);
       } else {
-        _debug('calling host function');
+        _debug(`calling host function ${fn.name}`);
         returnValue = fn.apply(context, args);
-        _debug('host function completed');
+        _debug(`host function completed ${fn.name}`);
       }
       return RuntimeValue.wrap(returnValue);
     } else {
-      throw new Error(`Can not execute non-function ${JSON.stringify(expr)}`);
+      new TypeError(`${fn} is not a function (${this.interpreter.codegen(expr)})`);
     }
   }
 
@@ -496,21 +500,29 @@ export class NodeHandler {
         _debug(`assigning ${expr.binding.name} new value`);
         return this.interpreter.updateVariableValue(expr.binding, await this.interpreter.evaluateNext(expr.expression));
       case 'ComputedMemberAssignmentTarget': {
-        const object = await this.interpreter.evaluateNext(expr.binding.object);
-        const property = await this.interpreter.evaluateNext(expr.binding.expression);
-        _debug(`evaluating expression ${expr.expression.type} to assign to ${property}`);
+        const object = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.binding.object));
+        const property = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.binding.expression));
+        _debug(`evaluating expression ${expr.expression.type} to assign to ${toString(property)}`);
         const value = await this.interpreter.evaluateNext(expr.expression);
-        _debug(`assigning object property "${property}" new value`);
-        const result = (object.unwrap()[property.unwrap()] = value);
+        _debug(`assigning object property "${toString(property)}" new value`);
+        const descriptor = Object.getOwnPropertyDescriptor(object, property);
+        let result = object[property] = value;
+        if (descriptor && isIntermediaryFunction(descriptor.set)) {
+          result = await result;
+        }
         return result;
       }
       case 'StaticMemberAssignmentTarget': {
-        const object = await this.interpreter.evaluateNext(expr.binding.object);
+        const object = RuntimeValue.unwrap(await this.interpreter.evaluateNext(expr.binding.object));
         const property = expr.binding.property;
         _debug(`evaluating expression ${expr.expression.type} to assign to ${property}`);
         const value = await this.interpreter.evaluateNext(expr.expression);
         _debug(`assigning object property "${property}" new value`);
-        const result = (object.unwrap()[property] = value);
+        const descriptor = Object.getOwnPropertyDescriptor(object, property);
+        let result = object[property] = value;
+        if (descriptor && isIntermediaryFunction(descriptor.set)) {
+          result = await result;
+        }
         return result;
       }
       case 'ArrayAssignmentTarget':
@@ -656,8 +668,14 @@ export class NodeHandler {
   async UnaryExpression(expr: UnaryExpression) {
     const operation = unaryOperatorMap.get(expr.operator);
     if (!operation) return this.interpreter.skipOrThrow(`${expr.type} : ${expr.operator}`);
-    const operand = await this.interpreter.evaluateNext(expr.operand);
-    return operation(operand.unwrap());
+    try {
+      const operand = await this.interpreter.evaluateNext(expr.operand);
+      return operation(operand.unwrap());  
+    } catch (e) {
+      if (e instanceof ReferenceError && expr.operator === 'typeof' && expr.operand.type === 'IdentifierExpression') {
+        return "undefined";
+      }
+    }
   }
 
   // TODO move any possible logic here.

@@ -1,4 +1,8 @@
+import chai from 'chai';
 import { assertResult, compare } from "../util";
+import {parseScript} from 'shift-parser';
+import {Interpreter, interpret, RuntimeValue} from '../../src';
+import { FunctionDeclaration, AssignmentExpression } from "shift-ast";
 
 describe("Functions", () => {
   it("should declare functions", async () => {
@@ -24,6 +28,39 @@ describe("Functions", () => {
   });
   it("should allow reference to arguments special variable", async () => {
     assertResult(await compare("function a(b){return arguments[0] + 10}; a(33);"));
+  });
+  it("should support .call()", async () => {
+    assertResult(
+      await compare(`
+    var context = {
+      expected: "hello",
+    };
+    function dyno(prop) {
+      return this[prop];
+    }
+    dyno.call(context, "expected");
+    `)
+    );
+  });
+  it("should support prototype modifications", async () => {
+    assertResult(await compare(`
+      function d() {}
+      d.prototype.run = function () {return "expected"};
+      d.prototype.run();
+    `))
+  })
+  it("should support .apply()", async () => {
+    assertResult(
+      await compare(`
+    var context = {
+      expected: "hello",
+    };
+    function dyno(prop) {
+      return this[prop];
+    }
+    dyno.apply(context, ["expected"]);
+    `)
+    );
   });
   it("should access appropriate context", async () => {
     assertResult(
@@ -53,6 +90,22 @@ describe("Functions", () => {
     `)
     );
   });
+
+  it("should hoist functions", async () => {
+    const src = 'a.b = 2; function a(){}'
+    const ast = parseScript(src);
+    const interpreter = new Interpreter();
+    interpreter.load(ast);
+    await interpreter.run();
+    const fnDecl = ast.statements.find(st => st.type==='FunctionDeclaration') as FunctionDeclaration;
+  
+    const fn = () => {
+      const value = interpreter.getRuntimeValue(fnDecl.name).unwrap();
+      chai.expect(value.b.unwrap()).to.equal(2);
+    }
+    chai.expect(fn).to.not.throw();
+  });
+
   it("should store and execute function expressions", async () => {
     assertResult(await compare("let a = function(){return 2}; a();"));
   });
@@ -82,7 +135,18 @@ describe("Getters/Setters", () => {
     assertResult(await compare("let a = { get b() {return 2} }; a.b;"));
   });
   it("should define setters", async () => {
-    assertResult(await compare("let holder = { set property(argument) {this._secretProp = argument} }; holder.property = 22; holder._secretProp"));
+    assertResult(await compare("let holder = { set property(argument) {this._secretProp = argument} }; holder.property = 22; false /* dummy expression to catch promise-based setter regression */; holder._secretProp"));
+  });
+  xit("should register setters properly on host objects", async () => {
+    // TODO: fix this
+    const tree = parseScript(`holder = { set property(argument) {this._secretProp = argument} };`);
+    //@ts-ignore
+    const objectExpression = tree.statements[0].expression as AssignmentExpression;
+    const interpreter = new Interpreter();
+    interpreter.load(tree);
+    const obj = RuntimeValue.unwrap(await interpreter.evaluateNext(objectExpression));
+    obj.property = 22;
+    chai.expect(obj._secretProp).to.equal(22);
   });
   it("should define both", async () => {
     assertResult(await compare("let a = { set b(c) {this._b = c + 10}, get b(){return this._b} }; a.b = 22; a.b"));

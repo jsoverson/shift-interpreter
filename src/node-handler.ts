@@ -39,13 +39,13 @@ import {
   VariableDeclarator,
   WhileStatement,
 } from 'shift-ast';
-import { InterpreterRuntimeError } from './errors';
-import { Interpreter } from './interpreter';
-import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } from './operators';
-import { InterpreterContext } from './context';
+import {InterpreterRuntimeError} from './errors';
+import {Interpreter} from './interpreter';
+import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
+import {InterpreterContext} from './context';
 import DEBUG from 'debug';
-import { RuntimeValue } from './runtime-value';
-import { isIntermediaryFunction, isGetterInternal, toString } from './util';
+import {RuntimeValue} from './runtime-value';
+import {isIntermediaryFunction, isGetterInternal, toString} from './util';
 import * as codegen from 'shift-printer';
 
 export interface DynamicClass {
@@ -63,7 +63,7 @@ export class NodeHandler {
 
   async ReturnStatement(stmt: ReturnStatement) {
     const value = await this.interpreter.evaluateNext(stmt.expression);
-    return new RuntimeValue(value.unwrap(), { didReturn: true });
+    return new RuntimeValue(value.unwrap(), {didReturn: true});
   }
 
   async ExpressionStatement(stmt: ExpressionStatement) {
@@ -240,7 +240,7 @@ export class NodeHandler {
 
     while ((result = iterator.next())) {
       if (result.done) break;
-      const { value } = result;
+      const {value} = result;
       switch (stmt.left.type) {
         case 'VariableDeclaration': {
           await this.interpreter.declareVariables(stmt.left);
@@ -359,7 +359,7 @@ export class NodeHandler {
 
   async ObjectExpression(expr: ObjectExpression) {
     const _debug = debug.extend('ObjectExpression');
-    const obj: { [key: string]: any } = {};
+    const obj: {[key: string]: any} = {};
     const batchOperations: Map<string, Map<string, () => any>> = new Map();
     function getPropertyDescriptors(name: string) {
       if (batchOperations.has(name)) return batchOperations.get(name)!;
@@ -476,7 +476,8 @@ export class NodeHandler {
 
     if (typeof fn === 'function') {
       let returnValue: RuntimeValue<any>;
-      let modifiedCall = (fn === Function.prototype.call || fn === Function.prototype.apply) && isIntermediaryFunction(context);
+      let modifiedCall =
+        (fn === Function.prototype.call || fn === Function.prototype.apply) && isIntermediaryFunction(context);
       if (fn._interp || modifiedCall) {
         // we have an interpreter-made function so the promise is ours.
         _debug(`calling interpreter function ${fn.name}`);
@@ -506,7 +507,7 @@ export class NodeHandler {
         const value = await this.interpreter.evaluateNext(expr.expression);
         _debug(`assigning object property "${toString(property)}" new value`);
         const descriptor = Object.getOwnPropertyDescriptor(object, property);
-        let result = object[property] = value;
+        let result = (object[property] = value);
         if (descriptor && isIntermediaryFunction(descriptor.set)) {
           result = await result;
         }
@@ -519,7 +520,7 @@ export class NodeHandler {
         const value = await this.interpreter.evaluateNext(expr.expression);
         _debug(`assigning object property "${property}" new value`);
         const descriptor = Object.getOwnPropertyDescriptor(object, property);
-        let result = object[property] = value;
+        let result = (object[property] = value);
         if (descriptor && isIntermediaryFunction(descriptor.set)) {
           result = await result;
         }
@@ -634,7 +635,7 @@ export class NodeHandler {
         interpreter.popContext();
         return returnValue;
       };
-      Object.assign(arrowFn, { _interp: true });
+      Object.assign(arrowFn, {_interp: true});
       return arrowFn;
     }.bind(interpreter.getCurrentContext())();
   }
@@ -670,10 +671,10 @@ export class NodeHandler {
     if (!operation) return this.interpreter.skipOrThrow(`${expr.type} : ${expr.operator}`);
     try {
       const operand = await this.interpreter.evaluateNext(expr.operand);
-      return operation(operand.unwrap());  
+      return operation(operand.unwrap());
     } catch (e) {
       if (e instanceof ReferenceError && expr.operator === 'typeof' && expr.operand.type === 'IdentifierExpression') {
-        return "undefined";
+        return 'undefined';
       }
     }
   }

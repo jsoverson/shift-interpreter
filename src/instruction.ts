@@ -1,4 +1,4 @@
-import { InstructionNode } from './types';
+import {InstructionNode} from './types';
 
 export class Instruction {
   node: InstructionNode;

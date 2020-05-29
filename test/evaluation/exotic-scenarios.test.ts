@@ -1,10 +1,10 @@
-import { parseScript } from "shift-parser";
-import { Interpreter } from '../../src/interpreter';
-import { ExpressionStatement } from "shift-ast";
+import {parseScript} from 'shift-parser';
+import {Interpreter} from '../../src/interpreter';
+import {ExpressionStatement} from 'shift-ast';
 import chai from 'chai';
 
-describe("ExoticScenarios", () => {
-  it("should allow piecemeal execution", async () => {
+describe('ExoticScenarios', () => {
+  it('should allow piecemeal execution', async () => {
     const source = `
     (function() {
       var c = {
@@ -65,11 +65,16 @@ describe("ExoticScenarios", () => {
     // @ts-ignore
     await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
     // @ts-ignore
-    await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0]);
+    await interpreter.evaluateStatement(
+      tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
+    );
     // @ts-ignore
-    const v = interpreter.getRuntimeValue(tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration.declarators[0].binding).unwrap();
-    chai.expect(v).to.deep.equal([ '3', '4', '2', '1', '0' ]);
-
+    const v = interpreter
+      .getRuntimeValue(
+        tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration
+          .declarators[0].binding,
+      )
+      .unwrap();
+    chai.expect(v).to.deep.equal(['3', '4', '2', '1', '0']);
   });
 });
-

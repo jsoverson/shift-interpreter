@@ -14,26 +14,26 @@ import {
   EmptyStatement,
 } from 'shift-ast';
 import * as codegen from 'shift-printer';
-import shiftScope, { ScopeLookup, Variable } from 'shift-scope';
-import { InterpreterContext } from './context';
-import { InterpreterRuntimeError } from './errors';
-import { NodeHandler } from './node-handler';
-import { BlockType, InstructionNode, FuncType, Identifier, Loop } from './types';
-import { createReadlineInterface, isStatement, isBlockType, isIntermediaryFunction } from './util';
+import shiftScope, {ScopeLookup, Variable} from 'shift-scope';
+import {InterpreterContext} from './context';
+import {InterpreterRuntimeError} from './errors';
+import {NodeHandler} from './node-handler';
+import {BlockType, InstructionNode, FuncType, Identifier, Loop} from './types';
+import {createReadlineInterface, isStatement, isBlockType, isIntermediaryFunction} from './util';
 import DEBUG from 'debug';
-import { Instruction } from './instruction';
-import { InstructionBuffer, InstructionBufferEventName } from './instruction-buffer';
-import { RuntimeValue } from './runtime-value';
-import { EventEmitter } from 'events';
+import {Instruction} from './instruction';
+import {InstructionBuffer, InstructionBufferEventName} from './instruction-buffer';
+import {RuntimeValue} from './runtime-value';
+import {EventEmitter} from 'events';
 import {inspect} from 'util';
-import { Breakpoint, NodeBreakpoint } from './breakpoint';
-import { waterfallMap } from './waterfall';
+import {Breakpoint, NodeBreakpoint} from './breakpoint';
+import {waterfallMap} from './waterfall';
 
 const debug = DEBUG('shift:interpreter');
 
 interface Options {
   skipUnsupported?: boolean;
-  handler?: { new (interpreter: Interpreter): NodeHandler };
+  handler?: {new (interpreter: Interpreter): NodeHandler};
 }
 
 export enum InterpreterEventName {
@@ -74,7 +74,7 @@ export class Interpreter extends EventEmitter {
   scopeLookup: any;
   variableMap = new Map<Variable, RuntimeValue<any>>();
   options: Options;
-  loadedScript: Script = new Script({directives:[], statements:[]});
+  loadedScript: Script = new Script({directives: [], statements: []});
   handler: NodeHandler;
   pointer = new InstructionBuffer();
   breakpoints: Breakpoint[] = [];
@@ -94,12 +94,12 @@ export class Interpreter extends EventEmitter {
     } else {
       this.handler = new NodeHandler(this);
     }
-    this.pointer.on(InstructionBufferEventName.CONTINUE, (nextInstruction:Instruction) => {
+    this.pointer.on(InstructionBufferEventName.CONTINUE, (nextInstruction: Instruction) => {
       this.emit(InterpreterEventName.CONTINUE, new InterpreterContinueEvent(nextInstruction));
-    })
-    this.pointer.on(InstructionBufferEventName.HALT, (nextInstruction:Instruction) => {
+    });
+    this.pointer.on(InstructionBufferEventName.HALT, (nextInstruction: Instruction) => {
       this.emit(InterpreterEventName.BREAK, new InterpreterBreakEvent(nextInstruction));
-    })
+    });
   }
 
   print(node?: Node) {
@@ -110,11 +110,11 @@ export class Interpreter extends EventEmitter {
   //   debug.enabled = true;
   // }
 
-  logNode(node:Node) {
+  logNode(node: Node) {
     codegen.log(node);
   }
 
-  codegen(node:Node) {
+  codegen(node: Node) {
     codegen.printTruncated(node);
   }
 
@@ -171,19 +171,19 @@ export class Interpreter extends EventEmitter {
     const whenBroken = this.onBreak();
     let programResult: null | RuntimeValue<any> = null;
     try {
-      const rootEvaluation = this.evaluateNext(nodeToEvaluate).then(result => programResult = result);
+      const rootEvaluation = this.evaluateNext(nodeToEvaluate).then(result => (programResult = result));
 
       const returnValue = await Promise.race([
-        whenBroken.then((evt:InterpreterBreakEvent) => RuntimeValue.wrap(this.lastInstruction.result)),
-        rootEvaluation.then((value:RuntimeValue<any>) => {
+        whenBroken.then((evt: InterpreterBreakEvent) => RuntimeValue.wrap(this.lastInstruction.result)),
+        rootEvaluation.then((value: RuntimeValue<any>) => {
           this.emit(InterpreterEventName.COMPLETE, new InterpreterCompleteEvent(value));
           return value;
-        })
+        }),
       ]);
       debug(`completed execution with result: ${returnValue.unwrap()}`);
-  
+
       return returnValue;
-    } catch(e) {
+    } catch (e) {
       this.handleError(e);
       throw e;
     }
@@ -202,18 +202,15 @@ export class Interpreter extends EventEmitter {
   onContinue() {
     return new Promise<InterpreterContinueEvent>((res, rej) => {
       this.once(InterpreterEvent.type.CONTINUE, res);
-    });  
+    });
   }
   onBreak() {
     return new Promise<InterpreterBreakEvent>((res, rej) => {
       this.once(InterpreterEvent.type.BREAK, res);
-    });  
+    });
   }
   onHalt() {
-    return Promise.race([
-      this.onBreak(),
-      this.onComplete()
-    ])
+    return Promise.race([this.onBreak(), this.onComplete()]);
   }
   runToFirstError(passedNode?: Script | Statement | Expression) {
     return this.run(passedNode).catch(e => {
@@ -310,7 +307,7 @@ exit, quit, q: quit
     } else {
       const nextInstruction = this.pointer.add(node);
       this.nextInstruction = nextInstruction;
-      const triggeredBreaks = this.breakpoints.filter((bp:Breakpoint) => bp.test(this));
+      const triggeredBreaks = this.breakpoints.filter((bp: Breakpoint) => bp.test(this));
       if (triggeredBreaks.length > 0) {
         debug('breakpoint hit');
         this.pause();
@@ -388,7 +385,7 @@ exit, quit, q: quit
       }
     }
     _debug(`completed ${block.type}, returning with: ${value}`);
-    return new RuntimeValue(value ? value.unwrap() : undefined, { didBreak, didContinue, didReturn });
+    return new RuntimeValue(value ? value.unwrap() : undefined, {didBreak, didContinue, didReturn});
   }
   async hoistVars(varDecl: VariableDeclarationStatement) {
     for (let declarator of varDecl.declaration.declarators) {
@@ -442,37 +439,43 @@ exit, quit, q: quit
           } else if (node.type === 'Setter') {
             fnDebug(`setter: binding passed parameter`);
             return interpreter.bindVariable(node.param, args[0]);
-          } else { 
-            return waterfallMap(node.params.items, (el: ArrayBinding | BindingIdentifier | BindingWithDefault | ObjectBinding, i:number) => {
-              fnDebug(`binding function argument ${i + 1}`);
-              return interpreter.bindVariable(el, args[i]);
-            })
+          } else {
+            return waterfallMap(
+              node.params.items,
+              (el: ArrayBinding | BindingIdentifier | BindingWithDefault | ObjectBinding, i: number) => {
+                fnDebug(`binding function argument ${i + 1}`);
+                return interpreter.bindVariable(el, args[i]);
+              },
+            );
           }
         }
 
         // Track https://github.com/microsoft/TypeScript/issues/36307 PR: https://github.com/microsoft/TypeScript/pull/31023
         //@ts-ignore
-        const interpreterPromise = bindParams().then(() => {
-          fnDebug('evaluating function body');
-        }).then(() => {
-          return interpreter.evaluateNext(node.body);
-        }).then((blockResult:RuntimeValue<any>) => {
-          fnDebug('completed evaluating function body');
-          interpreter.popContext();
-          return blockResult;
-        });
-        if (new.target) {
-          return interpreterPromise.then((result:RuntimeValue<any>) => {
-            if (result.didReturn && typeof result.value === "object" ) return result.value;
-            else return this;
+        const interpreterPromise = bindParams()
+          .then(() => {
+            fnDebug('evaluating function body');
           })
+          .then(() => {
+            return interpreter.evaluateNext(node.body);
+          })
+          .then((blockResult: RuntimeValue<any>) => {
+            fnDebug('completed evaluating function body');
+            interpreter.popContext();
+            return blockResult;
+          });
+        if (new.target) {
+          return interpreterPromise.then((result: RuntimeValue<any>) => {
+            if (result.didReturn && typeof result.value === 'object') return result.value;
+            else return this;
+          });
         } else {
-          return interpreterPromise.then((result:RuntimeValue<any>) => result.value);
+          return interpreterPromise.then((result: RuntimeValue<any>) => result.value);
         }
-      }
+      },
     }[name];
 
-    return Object.assign(fn, { _interp: true });
+    return Object.assign(fn, {_interp: true});
   }
 
   async bindVariable(

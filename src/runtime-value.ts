@@ -1,10 +1,9 @@
-
 export class RuntimeValue<T> {
   didReturn = false;
   didBreak = false;
   didContinue = false;
   value: T;
-  constructor(value:T, { didReturn = false, didContinue = false, didBreak = false } = {}) {
+  constructor(value: T, {didReturn = false, didContinue = false, didBreak = false} = {}) {
     this.value = value;
     this.didContinue = didContinue;
     this.didBreak = didBreak;

@@ -1,15 +1,15 @@
-import { InstructionNode } from './types';
-import { Instruction as Instruction } from './instruction';
+import {InstructionNode} from './types';
+import {Instruction} from './instruction';
 import * as codegen from 'shift-printer';
 import DEBUG from 'debug';
-import { EventEmitter } from 'events';
+import {EventEmitter} from 'events';
 
 const debug = DEBUG('shift:interpreter:buffer');
 
 export enum InstructionBufferEventName {
   REQUEST_EXECUTION = 'requestExecution',
   HALT = 'halt',
-  CONTINUE = 'continue'
+  CONTINUE = 'continue',
 }
 
 export class InstructionBuffer extends EventEmitter {
@@ -17,7 +17,6 @@ export class InstructionBuffer extends EventEmitter {
   numInstructions = 0;
   private isPaused = false;
   private wasPaused = false;
-
 
   add(node: InstructionNode): Instruction {
     debug(`queuing: ${codegen.printTruncated(node).trim()}`);
@@ -28,7 +27,7 @@ export class InstructionBuffer extends EventEmitter {
   step() {
     this.continue({force: true});
   }
-  continue(options:{force: boolean} = {force:false}) {
+  continue(options: {force: boolean} = {force: false}) {
     if (!options.force) {
       if (this.isPaused) {
         debug('paused, ignoring continue request');

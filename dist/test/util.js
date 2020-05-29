@@ -7,6 +7,7 @@ const chai_1 = require("chai");
 const shift_parser_1 = require("shift-parser");
 const interpreter_1 = require("../src/interpreter");
 const debug_1 = __importDefault(require("debug"));
+const src_1 = require("../src");
 const debug = debug_1.default('shift:interpreter:test');
 const evaluate = require('./nostrict-eval.js').eval;
 function assertResult(result) {
@@ -53,7 +54,10 @@ async function compare(src, context) {
     }
     let interpreterActualValue, interpreterActualError;
     try {
-        interpreterActualValue = await interpreter.run(shift_parser_1.parseScript(src));
+        interpreter.load(shift_parser_1.parseScript(src));
+        // const result = await interpreter.stepInteractive();
+        const result = await interpreter.run();
+        interpreterActualValue = src_1.RuntimeValue.unwrap(result);
     }
     catch (e) {
         interpreterActualError = e;

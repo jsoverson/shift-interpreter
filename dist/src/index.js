@@ -7,13 +7,16 @@ function interpretSource(source, context = {}) {
 }
 exports.interpretSource = interpretSource;
 function interpretTree(tree, context = {}) {
-    const interpreter = new interpreter_1.Interpreter(context);
-    return interpreter.run(tree);
+    const interpreter = new interpreter_1.Interpreter();
+    interpreter.load(tree);
+    interpreter.pushContext(context);
+    return interpreter.run();
 }
 exports.interpretTree = interpretTree;
+exports.default = interpretSource;
 exports.interpret = interpretSource;
 var interpreter_2 = require("./interpreter");
 exports.Interpreter = interpreter_2.Interpreter;
-var return_value_1 = require("./return-value");
-exports.ReturnValueWithState = return_value_1.ReturnValueWithState;
+var runtime_value_1 = require("./runtime-value");
+exports.RuntimeValue = runtime_value_1.RuntimeValue;
 //# sourceMappingURL=index.js.map

@@ -1,5 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const runtime_value_1 = require("./runtime-value");
+function deconstruct(rv) {
+    if (rv instanceof runtime_value_1.RuntimeValue)
+        return rv.unwrap();
+    else
+        return rv;
+}
 exports.binaryOperatorMap = new Map([
     ['+', (l, r) => l + r],
     ['-', (l, r) => l - r],

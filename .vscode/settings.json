@@ -2,5 +2,24 @@
   "mochaExplorer.debuggerConfig":"Debug Mocha Tests",
   "mochaExplorer.env": {
     "DEBUG": "shift:interpreter:*"
-  }
+  },
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#0c284c",
+    "activityBar.activeBorder": "#a51a57",
+    "activityBar.background": "#0c284c",
+    "activityBar.foreground": "#e7e7e7",
+    "activityBar.inactiveForeground": "#e7e7e799",
+    "activityBarBadge.background": "#a51a57",
+    "activityBarBadge.foreground": "#e7e7e7",
+    "statusBar.background": "#051120",
+    "statusBar.border": "#051120",
+    "statusBar.foreground": "#e7e7e7",
+    "statusBarItem.hoverBackground": "#0c284c",
+    "titleBar.activeBackground": "#051120",
+    "titleBar.activeForeground": "#e7e7e7",
+    "titleBar.border": "#051120",
+    "titleBar.inactiveBackground": "#05112099",
+    "titleBar.inactiveForeground": "#e7e7e799"
+  },
+  "peacock.color": "#051120"
 }

@@ -8,11 +8,12 @@ describe("Variables", () => {
     it("should update values", async () => {
         util_1.assertResult(await util_1.compare('let a = 2; a = 3; a;'));
     });
-    it("should update values", async () => {
+    it("should update and retrieve in one statement", async () => {
         util_1.assertResult(await util_1.compare('let a = 2; a = a + 2; a;'));
     });
     it("decltype-less assignments should assign a global", async () => {
-        util_1.assertResult(await util_1.compare('function a() { b = 2; } a(); b'));
+        const context = {};
+        util_1.assertResult(await util_1.compare('function a() { b = 2; } a(); b', context));
         // @ts-ignore
         delete global.b;
     });
@@ -28,10 +29,8 @@ describe("Variables", () => {
         util_1.assertResult(await util_1.compare('const a = 2; a;'));
     });
     xit("should not allow reassignment to constants", async () => {
-        // I'm not sure I care about accounting for this. The original JS will break and
-        // this project isn't meant to evaluate WIP JS, it's intended to analyze known-good JS.
-        // Deferring until necessary.
-        util_1.assertResult(await util_1.compare('const a = 2; const a = 3; a;'));
+        // I'm not sure I care about for this until I find a real world example.
+        util_1.assertResult(await util_1.compare('const a = 3; try { a = 4 } catch {} return a; '));
     });
     it("should allow array pattern assignments", async () => {
         util_1.assertResult(await util_1.compare('let [a] = [2]; a;'));

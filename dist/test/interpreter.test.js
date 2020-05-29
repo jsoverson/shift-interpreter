@@ -7,40 +7,68 @@ const chai_1 = __importDefault(require("chai"));
 const shift_parser_1 = require("shift-parser");
 const src_1 = require("../src");
 describe("interpreter", () => {
-    it("should lookup variable value", () => {
+    it("should lookup variable value", async () => {
         const src = 'const a = 2, b = 4;';
         const ast = shift_parser_1.parseScript(src);
         const interpreter = new src_1.Interpreter();
-        interpreter.run(ast);
+        await interpreter.run(ast);
         //@ts-ignore
-        const value = interpreter.getVariableValue(ast.statements[0].declaration.declarators[0].binding);
+        const value = interpreter.getRuntimeValue(ast.statements[0].declaration.declarators[0].binding).unwrap();
         chai_1.default.expect(value).to.equal(2);
     });
-    it("should return current and next execution expression", () => {
+    it("should step through execution", async () => {
         const src = 'const a = 2, b = 4;';
         const ast = shift_parser_1.parseScript(src);
         const interpreter = new src_1.Interpreter();
-        interpreter.analyze(ast);
-        const node = interpreter.getExecutionPointer();
-        chai_1.default.expect(node).to.be.undefined;
-        let nextNode = interpreter.getNextExecutionPointer();
-        chai_1.default.expect(nextNode.type).to.equal('VariableDeclarationStatement');
-        nextNode = interpreter.getNextExecutionPointer();
-        chai_1.default.expect(nextNode.type).to.equal('VariableDeclarator');
-        nextNode = interpreter.getNextExecutionPointer();
-        chai_1.default.expect(nextNode.type).to.equal('LiteralNumericExpression');
+        interpreter.load(ast);
+        chai_1.default.expect(interpreter.lastInstruction.node.type).to.equal('EmptyStatement');
+        await interpreter.step();
+        chai_1.default.expect(interpreter.lastInstruction.node.type).to.equal('Script');
+        await interpreter.step();
+        chai_1.default.expect(interpreter.lastInstruction.node.type).to.equal('VariableDeclarationStatement');
+        await interpreter.step();
+        chai_1.default.expect(interpreter.lastInstruction.node.type).to.equal('VariableDeclarator');
     });
-    // it("should step through expression by expression", () => {
-    //   const src = 'let a = 2; a = 4; a = 2 + 2;'
-    //   const ast = parseScript(src);
-    //   const interpreter = new Interpreter();
-    //   interpreter.analyze(ast);
-    //   //@ts-ignore
-    //   const identifier = ast.statements[0].declaration.declarators[0].binding;
-    //   const st1val = interpreter.step();
-    //   chai.expect(st1val).to.equal(2);
-    //   let idVal = interpreter.getVariableValue(identifier);
-    //   chai.expect(idVal).to.equal(2);
-    // });
+    it("should step through expression by expression", async () => {
+        const src = 'let a = 2; a = 4;';
+        const ast = shift_parser_1.parseScript(src);
+        const interpreter = new src_1.Interpreter();
+        interpreter.load(ast);
+        //@ts-ignore
+        const identifier = ast.statements[0].declaration.declarators[0].binding;
+        await interpreter.step();
+        await interpreter.step();
+        await interpreter.step();
+        await interpreter.step();
+        let idVal = interpreter.getRuntimeValue(identifier).unwrap();
+        chai_1.default.expect(idVal).to.equal(2);
+        await interpreter.step();
+        await interpreter.step();
+        await interpreter.step();
+        idVal = interpreter.getRuntimeValue(identifier).unwrap();
+        chai_1.default.expect(idVal).to.equal(4);
+    });
+    it("should break at specified node", async () => {
+        const src = 'let a = 2; a = 4;';
+        const ast = shift_parser_1.parseScript(src);
+        const interpreter = new src_1.Interpreter();
+        interpreter.load(ast);
+        //@ts-ignore
+        const identifier = ast.statements[0].declaration.declarators[0].binding;
+        //@ts-ignore
+        const num = ast.statements[1].expression.expression;
+        interpreter.breakAtNode(num);
+        const completionPromise = interpreter.onComplete();
+        let completed = false;
+        completionPromise.then(x => completed = true);
+        await interpreter.run();
+        let idVal = interpreter.getRuntimeValue(identifier).unwrap();
+        chai_1.default.expect(idVal).to.equal(2);
+        chai_1.default.expect(completed).to.be.false;
+        await interpreter.continue();
+        idVal = interpreter.getRuntimeValue(identifier).unwrap();
+        chai_1.default.expect(idVal).to.equal(4);
+        chai_1.default.expect(completed).to.be.true;
+    });
 });
 //# sourceMappingURL=interpreter.test.js.map

@@ -1,10 +1,10 @@
-import { expect } from "chai";
-import { parseScript } from "shift-parser";
-import { Interpreter } from "../src/interpreter";
-import { InterpreterContext } from "../src/context";
+import {expect} from 'chai';
+import {parseScript} from 'shift-parser';
+import {Interpreter} from '../src/interpreter';
+import {InterpreterContext} from '../src/context';
 
-import DEBUG from "debug";
-import { RuntimeValue } from "../src";
+import DEBUG from 'debug';
+import {RuntimeValue} from '../src';
 
 const debug = DEBUG('shift:interpreter:test');
 
@@ -20,20 +20,18 @@ export interface Result {
 }
 
 export function assertResult(result: Result) {
-  const message = result.expectedError ? 
-    `${result.src}: Actual "${result.actualError.message}", Expected "${result.expectedError.message}"` :
-    `${result.src}: Actual ${JSON.stringify(
-      result.actual
-    )}, Expected ${JSON.stringify(result.expected)}`
-  expect(result.success).to.equal(true,message);
+  const message = result.expectedError
+    ? `${result.src}: Actual "${result.actualError.message}", Expected "${result.expectedError.message}"`
+    : `${result.src}: Actual ${JSON.stringify(result.actual)}, Expected ${JSON.stringify(result.expected)}`;
+  expect(result.success).to.equal(true, message);
 }
 
 export function assertError(src: string, error: string) {
   debug(`assertError(\`${src}\`)`);
   const interpreter = new Interpreter();
 
-  let expected = "No error",
-    actual = "No error";
+  let expected = 'No error',
+    actual = 'No error';
   try {
     evaluate(src);
   } catch (e) {
@@ -65,7 +63,7 @@ export async function compare(src: string, context?: InterpreterContext): Promis
   try {
     interpreter.load(parseScript(src));
     // const result = await interpreter.stepInteractive();
-    const result = await interpreter.run()
+    const result = await interpreter.run();
     interpreterActualValue = RuntimeValue.unwrap(result);
   } catch (e) {
     interpreterActualError = e;
@@ -74,7 +72,7 @@ export async function compare(src: string, context?: InterpreterContext): Promis
   debug(`== Native result     : ${nativeExpectedValue}`);
   if (interpreterActualError) debug(`!! Interpreter error: ${interpreterActualError.message}`);
   else debug(`!! Interpreter error: <none>`);
-  if (nativeExpectedError)    debug(`!! Native error     : ${nativeExpectedError.message}`);
+  if (nativeExpectedError) debug(`!! Native error     : ${nativeExpectedError.message}`);
   else debug(`!! Native error     : <none>`);
   let success = false;
   if (Number.isNaN(nativeExpectedValue)) {
@@ -83,7 +81,7 @@ export async function compare(src: string, context?: InterpreterContext): Promis
   } else if (nativeExpectedError) {
     if (!interpreterActualError) {
       debug(`Failure: Native produced error, Interpreter did not`);
-      interpreterActualError = { message: '<<Did not throw an error>>' }
+      interpreterActualError = {message: '<<Did not throw an error>>'};
       success = false;
     } else {
       success = interpreterActualError.message === nativeExpectedError.message;
@@ -92,7 +90,7 @@ export async function compare(src: string, context?: InterpreterContext): Promis
   } else {
     if (interpreterActualError) {
       debug(`Failure: Interpreter produced error, Native did not`);
-      console.log(interpreterActualError)
+      console.log(interpreterActualError);
       success = false;
     } else {
       success = nativeExpectedValue === interpreterActualValue;
@@ -105,6 +103,6 @@ export async function compare(src: string, context?: InterpreterContext): Promis
     expected: nativeExpectedValue,
     expectedError: nativeExpectedError,
     src,
-    success
+    success,
   };
 }

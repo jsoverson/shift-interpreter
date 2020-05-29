@@ -33,7 +33,7 @@ describe("Literals", () => {
             util_1.assertResult(await util_1.compare('`hello ${"world"}`'));
         });
         xit("should evaluate tagged template strings", async () => {
-            // should it though? These are rarely seen. Deferring support until necessary.
+            // should it though? Deferring support until I run across them in a script I care about.
         });
     });
     it("should evaluate LiteralRegExpExpression", async () => {

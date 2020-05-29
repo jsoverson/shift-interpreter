@@ -1,6 +1,6 @@
 {
   "name": "shift-interpreter",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -13,7 +13,16 @@
     "watch": "tsc -w",
     "test": "mocha"
   },
-  "keywords": [],
+  "keywords": [
+    "interpreter",
+    "sandbox",
+    "vm",
+    "evaluate",
+    "javascript",
+    "ecmascript",
+    "debug",
+    "deobfuscate"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -21,6 +30,7 @@
     "@types/chai-spies": "^1.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^5.2.7",
+    "@types/multimap": "^1.1.1",
     "@types/node": "^13.13.4",
     "chai": "^4.2.0",
     "chai-spies": "^1.0.0",
@@ -35,7 +45,6 @@
     "command-line-args": "^5.1.1",
     "debug": "^4.1.1",
     "shift-ast": "^6.1.0",
-    "shift-codegen": "^7.0.0",
     "shift-parser": "^7.0.0",
     "shift-printer": "^1.0.1",
     "shift-scope": "^4.0.0"

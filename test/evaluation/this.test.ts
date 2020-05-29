@@ -1,12 +1,12 @@
-import chai from "chai";
-import spies from "chai-spies";
-import { assertResult, compare } from "../util";
+import chai from 'chai';
+import spies from 'chai-spies';
+import {assertResult, compare} from '../util';
 
 chai.use(spies);
 
-describe("this", () => {
-  it("should refer to local context", async () => {
-    const context = { global: {}, console };
+describe('this', () => {
+  it('should refer to local context', async () => {
+    const context = {global: {}, console};
     context.global = context;
 
     assertResult(
@@ -16,11 +16,11 @@ describe("this", () => {
         b : "Hello"
       }
       c.a();
-    `)
+    `),
     );
   });
-  it("should support dynamic context", async () => {
-    const context = { global: {}, console };
+  it('should support dynamic context', async () => {
+    const context = {global: {}, console};
     context.global = context;
 
     assertResult(
@@ -39,7 +39,7 @@ describe("this", () => {
       b : "outerValue"
     }
     outer.outerFn();
-    `)
+    `),
     );
   });
 });

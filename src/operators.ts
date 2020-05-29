@@ -1,4 +1,4 @@
-import { RuntimeValue } from "./runtime-value";
+import {RuntimeValue} from './runtime-value';
 
 function deconstruct(rv: any): any {
   if (rv instanceof RuntimeValue) return rv.unwrap();

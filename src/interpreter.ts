@@ -451,8 +451,8 @@ exit, quit, q: quit
         }
 
         // Track https://github.com/microsoft/TypeScript/issues/36307 PR: https://github.com/microsoft/TypeScript/pull/31023
-        //@ts-ignore
         const interpreterPromise = bindParams()
+          //@ts-ignore
           .then(() => {
             fnDebug('evaluating function body');
           })

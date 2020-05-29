@@ -1,1 +1,0 @@
-{"version":3,"file":"breakpoint.js","sourceRoot":"","sources":["../../src/breakpoint.ts"],"names":[],"mappings":";;AAGA,MAAsB,UAAU;CAE/B;AAFD,gCAEC;AAED,MAAa,cAAc;IAEzB,YAAY,IAAS;QACnB,IAAI,CAAC,IAAI,GAAG,IAAI,CAAC;IACnB,CAAC;IACD,IAAI,CAAC,WAAwB;QAC3B,OAAO,WAAW,CAAC,eAAe,CAAC,IAAI,KAAK,IAAI,CAAC,IAAI,CAAC;IACxD,CAAC;CACF;AARD,wCAQC"}

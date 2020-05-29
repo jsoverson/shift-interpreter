@@ -64,13 +64,13 @@ describe('ExoticScenarios', () => {
     interpreter.load(tree);
     // @ts-ignore
     await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
-    // @ts-ignore
     await interpreter.evaluateStatement(
-      tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
-    );
     // @ts-ignore
+    tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
+    );
     const v = interpreter
       .getRuntimeValue(
+    // @ts-ignore
         tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration
           .declarators[0].binding,
       )

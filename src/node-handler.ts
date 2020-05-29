@@ -229,6 +229,8 @@ export class NodeHandler {
     return returnValue;
   }
 
+  // TODO: Refactor loops. They have poor support in assignments and have duplicated logic
+
   async ForOfStatement(stmt: ForOfStatement) {
     this.interpreter.currentLoops.push(stmt);
     const iterationExpression = (await this.interpreter.evaluateNext(stmt.right)).unwrap();
@@ -267,6 +269,13 @@ export class NodeHandler {
         for (let a in iterationExpression.unwrap()) {
           if (binding.type === 'BindingIdentifier') this.interpreter.updateVariableValue(binding, a);
           else this.interpreter.skipOrThrow(stmt.type + '.left->' + binding.type);
+          await this.interpreter.evaluateNext(stmt.body);
+        }
+        break;
+      }
+      case 'AssignmentTargetIdentifier': {
+        for (let a in iterationExpression.unwrap()) {
+          this.interpreter.updateVariableValue(stmt.left, a);
           await this.interpreter.evaluateNext(stmt.body);
         }
         break;

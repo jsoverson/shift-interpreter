@@ -28,6 +28,7 @@ describe('Loops', () => {
   });
   it('should support for...in statements', async () => {
     assertResult(await compare(`let a = {a:1,b:2},c = 0; for (let b in a) { c+=a[b]; } c;`));
+    assertResult(await compare(`let a = {a:1,b:2},c = 0,b; for (b in a) { c+=a[b]; } c;`));
   });
   it('should support for...of statements', async () => {
     assertResult(await compare(`let a = [1,2],c = 0; for (let b of a) { c+=b; } c;`));

@@ -37,4 +37,7 @@ describe('BinaryExpressions', () => {
       if (result.status === 'fulfilled') assertResult(result.value);
     });
   });
+  it('should retain shortcircuit behavior', async () => {
+    assertResult(await compare(`typeof x == 'string' && nonexistant()`));
+  });
 });

@@ -333,9 +333,6 @@ exit, quit, q: quit
   }
   async evaluateBlock(block: BlockType): Promise<RuntimeValue<any>> {
     let value;
-    let didBreak = false;
-    let didContinue = false;
-    let didReturn = false;
     const _debug = debug.extend('evaluateBlock');
     _debug(`evaluating ${block.type} statements`);
 
@@ -358,34 +355,28 @@ exit, quit, q: quit
 
     for (let i = 0; i < block.statements.length; i++) {
       const statement = block.statements[i];
-      if (statement.type === 'BreakStatement') {
-        _debug(`break found in block`);
-        didBreak = true;
-        break;
-      }
-      if (statement.type === 'ContinueStatement') {
-        _debug(`continue found in block`);
-        didContinue = true;
-        break;
-      }
+
       // skip over functions we've already declared above
       if (statement.type !== 'FunctionDeclaration') {
         _debug(`Evaluating next ${statement.type} in ${block.type}`);
         value = await this.evaluateNext(statement);
         _debug(`${block.type} statement ${statement.type} completed`);
       }
+      if (value && value.didBreak) {
+        _debug(`break found in block`);
+        break;
+      }
+      if (value && value.didContinue) {
+        _debug(`continue found in block`);
+        break;
+      }
       if (value && value.didReturn) {
         _debug(`returning from block with value: ${value}`);
         return value;
       }
-      if (statement.type === 'ReturnStatement') {
-        _debug(`return found in block`);
-        didReturn = true;
-        break;
-      }
     }
     _debug(`completed ${block.type}, returning with: ${value}`);
-    return new RuntimeValue(value ? value.unwrap() : undefined, {didBreak, didContinue, didReturn});
+    return RuntimeValue.wrap(value);
   }
   async hoistVars(varDecl: VariableDeclarationStatement) {
     for (let declarator of varDecl.declaration.declarators) {

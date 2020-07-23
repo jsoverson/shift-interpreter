@@ -694,9 +694,12 @@ export class NodeHandler {
     }
   }
 
-  // TODO move any possible logic here.
-  async BreakStatement(...args: any) {}
-  async ContinueStatement(...args: any) {}
+  async BreakStatement(...args: any) {
+    return new RuntimeValue(undefined, {didBreak: true});
+  }
+  async ContinueStatement(...args: any) {
+    return new RuntimeValue(undefined, {didContinue: true});
+  }
   async EmptyStatement(...args: any) {}
 
   // TODO support these nodes

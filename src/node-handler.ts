@@ -685,6 +685,7 @@ export class NodeHandler {
       if (e instanceof ReferenceError && expr.operator === 'typeof' && expr.operand.type === 'IdentifierExpression') {
         return 'undefined';
       }
+      throw e;
     }
   }
 

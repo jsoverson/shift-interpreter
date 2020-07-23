@@ -22,4 +22,7 @@ describe('UnaryExpressions', () => {
   it('should evaluate typeof on an undeclared variable', async () => {
     assertResult(await compare(`typeof foo`));
   });
+  it('should propagate thrown errors', async () => {
+    assertResult(await compare(`try {!(() => n++)();'bad';} catch (e) {'good';}`));
+  });
 });

@@ -1,5 +1,5 @@
 {
-  "mochaExplorer.debuggerConfig":"Debug Mocha Tests",
+  "mochaExplorer.debuggerConfig": "Debug Mocha Tests",
   "mochaExplorer.env": {
     "DEBUG": "shift:interpreter:*"
   },
@@ -21,5 +21,6 @@
     "titleBar.inactiveBackground": "#05112099",
     "titleBar.inactiveForeground": "#e7e7e799"
   },
-  "peacock.color": "#051120"
+  "peacock.color": "#051120",
+  "debug.javascript.usePreview": false
 }

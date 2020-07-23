@@ -25,4 +25,7 @@ describe('UnaryExpressions', () => {
   it('should propagate thrown errors', async () => {
     assertResult(await compare(`try {!(() => n++)();'bad';} catch (e) {'good';}`));
   });
+  it('typeof should not produce an error', async () => {
+    assertResult(await compare(`typeof x == 'string' && nonexistant()`));
+  });
 });

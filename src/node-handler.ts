@@ -529,9 +529,12 @@ export class NodeHandler {
         const value = await this.interpreter.evaluateNext(expr.expression);
         _debug(`assigning object property "${property}" new value`);
         const descriptor = Object.getOwnPropertyDescriptor(object, property);
-        let result = (object[property] = value);
-        if (descriptor && isIntermediaryFunction(descriptor.set)) {
-          result = await result;
+
+        let result = null;
+        if (descriptor && descriptor.set && isIntermediaryFunction(descriptor.set)) {
+          result = await descriptor.set.call(object, value);
+        } else {
+          result = object[property] = value;
         }
         return result;
       }
@@ -672,8 +675,10 @@ export class NodeHandler {
   async BinaryExpression(expr: BinaryExpression) {
     const operation = binaryOperatorMap.get(expr.operator);
     const left = await this.interpreter.evaluateNext(expr.left);
-    const right = await this.interpreter.evaluateNext(expr.right);
-    return operation(left.unwrap(), right.unwrap());
+    const deferredRight = async () => {
+      return (await this.interpreter.evaluateNext(expr.right)).unwrap();
+    };
+    return await operation(left.unwrap(), deferredRight);
   }
   async UnaryExpression(expr: UnaryExpression) {
     const operation = unaryOperatorMap.get(expr.operator);

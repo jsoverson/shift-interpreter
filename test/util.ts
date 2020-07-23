@@ -49,7 +49,12 @@ export function assertError(src: string, error: string) {
   expect(actual).to.equal(expected);
 }
 
-export async function compare(src: string, context?: InterpreterContext): Promise<Result> {
+function funcify(fn: Function) {
+  const src = fn.toString();
+  return `(${src})()`;
+}
+
+export async function compare(src: string | Function, context?: InterpreterContext): Promise<Result> {
   const interpreter = new Interpreter();
   if (context) interpreter.pushContext(context);
   let nativeExpectedValue, nativeExpectedError;
@@ -60,8 +65,9 @@ export async function compare(src: string, context?: InterpreterContext): Promis
     nativeExpectedError = e;
   }
   let interpreterActualValue, interpreterActualError;
+  let finalSrc = typeof src === 'string' ? src : funcify(src);
   try {
-    interpreter.load(parseScript(src));
+    interpreter.load(parseScript(finalSrc));
     // const result = await interpreter.stepInteractive();
     const result = await interpreter.run();
     interpreterActualValue = RuntimeValue.unwrap(result);
@@ -102,7 +108,7 @@ export async function compare(src: string, context?: InterpreterContext): Promis
     actualError: interpreterActualError,
     expected: nativeExpectedValue,
     expectedError: nativeExpectedError,
-    src,
+    src: finalSrc,
     success,
   };
 }

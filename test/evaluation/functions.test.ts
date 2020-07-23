@@ -8,7 +8,7 @@ describe('Functions', () => {
   it('should declare functions', async () => {
     assertResult(await compare('function a(){return 2}; a();'));
   });
-  it('should hoist functions', async () => {
+  it('should hoist functions for purposes of member access/assignment', async () => {
     assertResult(await compare("a.foo = 'bar'; function a(){}; a.foo;"));
   });
   it('should assign arrow expressions', async () => {
@@ -157,6 +157,19 @@ describe('Getters/Setters', () => {
     chai.expect(obj._secretProp).to.equal(22);
   });
   it('should define both', async () => {
-    assertResult(await compare('let a = { set b(c) {this._b = c + 10}, get b(){return this._b} }; a.b = 22; a.b'));
+    const src = `
+      let a = {
+        _b: 0,
+        set b(c) {
+          this._b = c + 10;
+        },
+        get b() {
+          return this._b;
+        },
+      };
+      a.b = 22;
+      a.b;
+    `;
+    assertResult(await compare(src));
   });
 });

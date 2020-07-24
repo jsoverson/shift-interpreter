@@ -199,11 +199,10 @@ export class NodeHandler {
     let returnValue = undefined;
     try {
       returnValue = this.interpreter.evaluateNext(stmt.body);
-      if (returnValue.didReturn) return returnValue;
     } catch (e) {
+      console.log(e);
       this.interpreter.bindVariable(stmt.catchClause.binding, e);
       returnValue = this.interpreter.evaluateNext(stmt.catchClause.body);
-      if (returnValue.didReturn) return returnValue;
     }
     return returnValue;
   }
@@ -213,22 +212,17 @@ export class NodeHandler {
     if (stmt.catchClause) {
       try {
         returnValue = this.interpreter.evaluateNext(stmt.body);
-        // if (returnValue.didReturn) return returnValue;
       } catch (e) {
         this.interpreter.bindVariable(stmt.catchClause.binding, e);
         returnValue = this.interpreter.evaluateNext(stmt.catchClause.body);
-        // if (returnValue.didReturn) return returnValue;
       } finally {
         returnValue = this.interpreter.evaluateNext(stmt.finalizer);
-        // if (returnValue.didReturn) return returnValue;
       }
     } else {
       try {
         returnValue = this.interpreter.evaluateNext(stmt.body);
-        // if (returnValue.didReturn) return returnValue;
       } finally {
         returnValue = this.interpreter.evaluateNext(stmt.finalizer);
-        // if (returnValue.didReturn) return returnValue;
       }
     }
     return returnValue;

@@ -7,6 +7,23 @@ describe('Try/Catch', () => {
   it('should allow rethrowing', () => {
     assertResult(compare(`try{ throw new Error('err') } catch(e) {throw e}`, {Error}));
   });
+  it('should return from try', () => {
+    assertResult(
+      compare(
+        `
+    function returns() {
+      try {
+        return 11;
+      } catch (thrown) {
+        return 'not this 1';
+      }
+      return 'not this 2';
+    };
+    returns();
+    `,
+      ),
+    );
+  });
   it('should return from catch', () => {
     assertResult(
       compare(

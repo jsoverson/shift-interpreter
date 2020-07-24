@@ -5,7 +5,7 @@ import spies from 'chai-spies';
 chai.use(spies);
 
 describe('External context', () => {
-  it('should call functions defined on the context', async () => {
+  it('should call functions defined on the context', () => {
     const console = {
       log: function(msg: string) {
         return undefined;
@@ -14,7 +14,7 @@ describe('External context', () => {
     chai.spy.on(console, 'log');
 
     assertResult(
-      await compare(
+      compare(
         `
       console.log("Hello world");
     `,

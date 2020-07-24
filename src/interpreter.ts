@@ -183,7 +183,7 @@ export class Interpreter extends EventEmitter {
     if (state !== undefined) this._isContinuing = state;
     return this._isContinuing;
   }
-  async run(passedNode?: InstructionNode): Promise<any> {
+  run(passedNode?: InstructionNode): Promise<any> {
     let nodeToEvaluate: InstructionNode | undefined = undefined;
 
     if (passedNode) {
@@ -215,18 +215,11 @@ export class Interpreter extends EventEmitter {
     const whenBroken = this.onBreak();
     let programResult: any = null;
     try {
-      const rootEvaluation = this.evaluateNext(nodeToEvaluate).then(result => (programResult = result));
+      programResult = this.evaluateNext(nodeToEvaluate);
+      this.emit(InterpreterEventName.COMPLETE, new InterpreterCompleteEvent(programResult));
+      debug(`completed execution with result: ${programResult}`);
 
-      const returnValue = await Promise.race([
-        whenBroken.then((evt: InterpreterBreakEvent) => this.lastInstruction.result),
-        rootEvaluation.then((value: any) => {
-          this.emit(InterpreterEventName.COMPLETE, new InterpreterCompleteEvent(value));
-          return value;
-        }),
-      ]);
-      debug(`completed execution with result: ${returnValue}`);
-
-      return returnValue;
+      return programResult;
     } catch (e) {
       this.handleError(e);
       throw e;
@@ -262,64 +255,64 @@ export class Interpreter extends EventEmitter {
       return undefined;
     });
   }
-  async step() {
-    this.pointer.pause();
-    debug('stepping');
-    if (!this.hasStarted) {
-      this.run();
-    }
-    this.pointer.step();
-    return this.onHalt();
-  }
-  async stepInteractive() {
-    const readline = createReadlineInterface();
-    outerloop: while (true) {
-      const answer = await readline('> ');
-      switch (answer) {
-        case 'next':
-        case 'step':
-        case 'n':
-        case 's':
-        case '':
-          const nextInstruction = this.pointer.buffer[0];
-          const lastInstruction = this.lastInstruction;
-          if (lastInstruction) {
-            const result = lastInstruction.result;
-            if (isIntermediaryFunction(result)) {
-              console.log(`Result: interpreter intermediary function ${result.name}`);
-            } else {
-              console.log(`Result:`);
-              console.log(inspect(result));
-            }
-          }
-          if (nextInstruction) {
-            console.log(`next: ${codegen.printSummary(nextInstruction.node)}`);
-          } else if (this.loadedScript) {
-            console.log(`next: Script (${this.loadedScript.statements.length} statements)`);
-          }
-          await this.step();
-          break;
-        case 'exit':
-        case 'quit':
-        case 'q':
-          break outerloop;
-        default:
-          console.log(`
-command ${answer} not understood.
-next, step, n, s, <enter>: step
-exit, quit, q: quit
-`);
-      }
-    }
-    console.log('exiting');
-  }
+  //   async step() {
+  //     this.pointer.pause();
+  //     debug('stepping');
+  //     if (!this.hasStarted) {
+  //       this.run();
+  //     }
+  //     this.pointer.step();
+  //     return this.onHalt();
+  //   }
+  //   async stepInteractive() {
+  //     const readline = createReadlineInterface();
+  //     outerloop: while (true) {
+  //       const answer = await readline('> ');
+  //       switch (answer) {
+  //         case 'next':
+  //         case 'step':
+  //         case 'n':
+  //         case 's':
+  //         case '':
+  //           const nextInstruction = this.pointer.buffer[0];
+  //           const lastInstruction = this.lastInstruction;
+  //           if (lastInstruction) {
+  //             const result = lastInstruction.result;
+  //             if (isIntermediaryFunction(result)) {
+  //               console.log(`Result: interpreter intermediary function ${result.name}`);
+  //             } else {
+  //               console.log(`Result:`);
+  //               console.log(inspect(result));
+  //             }
+  //           }
+  //           if (nextInstruction) {
+  //             console.log(`next: ${codegen.printSummary(nextInstruction.node)}`);
+  //           } else if (this.loadedScript) {
+  //             console.log(`next: Script (${this.loadedScript.statements.length} statements)`);
+  //           }
+  //           await this.step();
+  //           break;
+  //         case 'exit':
+  //         case 'quit':
+  //         case 'q':
+  //           break outerloop;
+  //         default:
+  //           console.log(`
+  // command ${answer} not understood.
+  // next, step, n, s, <enter>: step
+  // exit, quit, q: quit
+  // `);
+  //       }
+  //     }
+  //     console.log('exiting');
+  //   }
   pause() {
     debug('pausing');
-    this.pointer.pause();
+    // this.pointer.pause();
   }
   unpause() {
     debug('unpausing');
-    this.pointer.unpause();
+    // this.pointer.unpause();
   }
   continue() {
     this.unpause();
@@ -328,26 +321,22 @@ exit, quit, q: quit
   breakAtNode(node: Node) {
     this.breakpoints.push(new NodeBreakpoint(node));
   }
-  async evaluateInstruction(instruction: Instruction) {
+  evaluateInstruction(instruction: Instruction) {
     this.lastInstruction = instruction;
-    let promise;
+    let result;
     if (isBlockType(instruction.node)) {
-      promise = this.evaluateBlock(instruction.node);
-      this.isReturning(false);
-      this.isContinuing(false);
-      this.isBreaking(false);
+      result = this.evaluateBlock(instruction.node);
     } else if (isStatement(instruction.node)) {
-      promise = this.evaluateStatement(instruction.node);
+      result = this.evaluateStatement(instruction.node);
     } else if (instruction.node.type === 'VariableDeclarator') {
-      promise = this.handler.VariableDeclarator(instruction.node);
+      result = this.handler.VariableDeclarator(instruction.node);
     } else {
-      promise = this.evaluateExpression(instruction.node);
+      result = this.evaluateExpression(instruction.node);
     }
-    const result = await promise;
     instruction.result = result;
     return result;
   }
-  async evaluateNext(node: InstructionNode | null): Promise<any> {
+  evaluateNext(node: InstructionNode | null): any {
     if (node === null) {
       return undefined;
     } else {
@@ -358,7 +347,11 @@ exit, quit, q: quit
         debug('breakpoint hit');
         this.pause();
       }
-      const instruction = await this.pointer.awaitExecution();
+      const instruction = this.pointer.nextInstruction();
+      if (!instruction) {
+        debug(`no instruction to evaluate, returning`);
+        return;
+      }
       debug(`evaluating instruction (${this.lastInstruction.node.type}->${node.type})`);
       try {
         return this.evaluateInstruction(instruction);
@@ -387,15 +380,15 @@ exit, quit, q: quit
     this.lastStatement = stmt;
     return this.handler[stmt.type](stmt);
   }
-  async hoistFunctions(block: BlockType) {
+  hoistFunctions(block: BlockType) {
     const functions = block.statements.filter(s => s.type === 'FunctionDeclaration');
     if (functions.length) debug(`hoisting ${functions.length} functions in ${block.type}`);
     for (let fnDecl of functions) {
-      await this.evaluateNext(fnDecl);
+      this.evaluateNext(fnDecl);
     }
   }
 
-  async hoistVars(block: BlockType) {
+  hoistVars(block: BlockType) {
     const vars = block.statements
       .filter(
         <(T: Statement) => T is VariableDeclarationStatement>(stmt => stmt.type === 'VariableDeclarationStatement'),
@@ -403,17 +396,17 @@ exit, quit, q: quit
       .filter((decl: VariableDeclarationStatement) => decl.declaration.kind === 'var');
     if (vars.length) debug(`hoisting ${vars.length} vars in ${block.type}`);
     for (let varDecl of vars) {
-      await waterfallMap(varDecl.declaration.declarators, declarator =>
-        this.bindVariable(declarator.binding, undefined),
-      );
+      for (let declarator of varDecl.declaration.declarators) this.bindVariable(declarator.binding, undefined);
     }
   }
 
-  async declareVariables(decl: VariableDeclaration) {
-    return waterfallMap(decl.declarators, declarator => this.evaluateNext(declarator));
+  declareVariables(decl: VariableDeclaration) {
+    for (let declarator of decl.declarators) {
+      this.evaluateNext(declarator);
+    }
   }
 
-  async createFunction(node: FuncType) {
+  createFunction(node: FuncType) {
     const _debug = debug.extend('createFunction');
     let name: string | undefined = undefined;
     if (node.name) {
@@ -422,7 +415,7 @@ exit, quit, q: quit
           name = node.name.name;
           break;
         case 'ComputedPropertyName':
-          name = await this.evaluateNext(node.name.expression);
+          name = this.evaluateNext(node.name.expression);
           break;
         case 'StaticPropertyName':
           name = node.name.value;
@@ -451,50 +444,36 @@ exit, quit, q: quit
           if (argsRef) interpreter.setRuntimeValue(argsRef, arguments);
         }
 
-        function bindParams(): Promise<void | void[]> {
-          if (node.type === 'Getter') {
-            return Promise.resolve();
-          } else if (node.type === 'Setter') {
-            fnDebug(`setter: binding passed parameter`);
-            return interpreter.bindVariable(node.param, args[0]);
-          } else {
-            return waterfallMap(
-              node.params.items,
-              (el: ArrayBinding | BindingIdentifier | BindingWithDefault | ObjectBinding, i: number) => {
-                fnDebug(`binding function argument ${i + 1}`);
-                return interpreter.bindVariable(el, args[i]);
-              },
-            );
-          }
-        }
-
-        const interpreterPromise = bindParams()
-          .then(() => {
-            fnDebug('evaluating function body');
-          })
-          .then(() => {
-            return interpreter.evaluateNext(node.body);
-          })
-          .then((blockResult: any) => {
-            fnDebug('completed evaluating function body');
-            interpreter.popContext();
-            return blockResult;
-          });
-        if (new.target) {
-          return interpreterPromise.then((result: any) => {
-            if (interpreter.isReturning()) {
-              interpreter.isReturning(false);
-              if (typeof result === 'object') return result;
-            }
-            return this;
-          });
+        if (node.type === 'Getter') {
+          // nothing
+        } else if (node.type === 'Setter') {
+          fnDebug(`setter: binding passed parameter`);
+          interpreter.bindVariable(node.param, args[0]);
         } else {
-          return interpreterPromise.then((result: any) => {
-            if (interpreter.isReturning()) {
-              interpreter.isReturning(false);
-            }
-            return result;
-          });
+          node.params.items.forEach(
+            (el: ArrayBinding | BindingIdentifier | BindingWithDefault | ObjectBinding, i: number) => {
+              fnDebug(`binding function argument ${i + 1}`);
+              return interpreter.bindVariable(el, args[i]);
+            },
+          );
+        }
+        fnDebug('evaluating function body');
+        const result = interpreter.evaluateNext(node.body);
+        fnDebug('completed evaluating function body');
+
+        interpreter.popContext();
+
+        if (new.target) {
+          if (interpreter.isReturning()) {
+            interpreter.isReturning(false);
+            if (typeof result === 'object') return result;
+          }
+          return this;
+        } else {
+          if (interpreter.isReturning()) {
+            interpreter.isReturning(false);
+          }
+          return result;
         }
       },
     }[name];
@@ -502,7 +481,7 @@ exit, quit, q: quit
     return Object.assign(fn, {_interp: true});
   }
 
-  async bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
+  bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
     const _debug = debug.extend('bindVariable');
     _debug(`${binding.type} => ${init}`);
     switch (binding.type) {
@@ -521,7 +500,7 @@ exit, quit, q: quit
           for (let i = 0; i < binding.elements.length; i++) {
             const el = binding.elements[i];
             const indexElement = init[i];
-            if (el) await this.bindVariable(el, indexElement);
+            if (el) this.bindVariable(el, indexElement);
           }
           if (binding.rest) this.skipOrThrow('ArrayBinding->Rest/Spread');
         }
@@ -533,16 +512,14 @@ exit, quit, q: quit
             if (prop.type === 'BindingPropertyIdentifier') {
               const name = prop.binding.name;
               if (init[name] === undefined && prop.init) {
-                await this.bindVariable(prop.binding, await this.evaluateNext(prop.init));
+                this.bindVariable(prop.binding, this.evaluateNext(prop.init));
               } else {
-                await this.bindVariable(prop.binding, init[name]);
+                this.bindVariable(prop.binding, init[name]);
               }
             } else {
               const name =
-                prop.name.type === 'ComputedPropertyName'
-                  ? await this.evaluateNext(prop.name.expression)
-                  : prop.name.value;
-              await this.bindVariable(prop.binding, init[name]);
+                prop.name.type === 'ComputedPropertyName' ? this.evaluateNext(prop.name.expression) : prop.name.value;
+              this.bindVariable(prop.binding, init[name]);
             }
           }
           if (binding.rest) this.skipOrThrow('ObjectBinding->Rest/Spread');
@@ -551,11 +528,11 @@ exit, quit, q: quit
       case 'BindingWithDefault':
         if (init === undefined) {
           _debug(`evaluating default for undefined argument`);
-          const defaults = await this.evaluateNext(binding.init);
+          const defaults = this.evaluateNext(binding.init);
           _debug(`binding default`);
-          await this.bindVariable(binding.binding, defaults);
+          this.bindVariable(binding.binding, defaults);
         } else {
-          await this.bindVariable(binding.binding, init);
+          this.bindVariable(binding.binding, init);
         }
         break;
     }

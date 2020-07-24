@@ -2,9 +2,9 @@ import {describe} from 'mocha';
 import {assertResult, compare} from '../util';
 
 describe('new', () => {
-  it('should instantiate functions and retain prototype chain', async () => {
+  it('should instantiate functions and retain prototype chain', () => {
     assertResult(
-      await compare(`
+      compare(`
       function d() {}
       d.prototype.run = function () {return "expected"};
       d.prototype.run();
@@ -14,9 +14,9 @@ describe('new', () => {
     );
   });
 
-  it('should return the return value for an instantiated function if the fn returns', async () => {
+  it('should return the return value for an instantiated function if the fn returns', () => {
     assertResult(
-      await compare(`
+      compare(`
       function d() { return { run() {return 'this one'}}; }
       d.prototype.run = function () {return "not this one"};
       d.prototype.run();
@@ -25,9 +25,9 @@ describe('new', () => {
     `),
     );
   });
-  it('should still return the "this" if a primitive is returned', async () => {
+  it('should still return the "this" if a primitive is returned', () => {
     assertResult(
-      await compare(`
+      compare(`
       function d() { return 2; }
       d.prototype.run = function () {return "expected"};
       d.prototype.run();

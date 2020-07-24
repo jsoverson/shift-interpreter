@@ -5,10 +5,10 @@ import chai from 'chai';
 import {assertResult, compare} from '../util';
 
 describe('ExoticScenarios', () => {
-  it('what', async () => {
-    assertResult(await compare(`'();'.replace('()', function(){})`));
+  it('what', () => {
+    assertResult(compare(`'();'.replace('()', function(){})`));
   });
-  it('should allow piecemeal execution', async () => {
+  it('should allow piecemeal execution', () => {
     const source = `
     (function() {
       var c = {
@@ -67,8 +67,8 @@ describe('ExoticScenarios', () => {
     const interpreter = new Interpreter();
     interpreter.load(tree);
     // @ts-ignore
-    await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
-    await interpreter.evaluateStatement(
+    interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
+    interpreter.evaluateStatement(
       // @ts-ignore
       tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
     );

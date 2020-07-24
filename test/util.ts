@@ -54,7 +54,7 @@ function funcify(fn: Function) {
   return `(${src})()`;
 }
 
-export async function compare(src: string | Function, context?: BasicContext): Promise<Result> {
+export function compare(src: string | Function, context?: BasicContext): Result {
   const interpreter = new Interpreter();
   if (context) interpreter.pushContext(context);
   let nativeExpectedValue, nativeExpectedError;
@@ -68,8 +68,8 @@ export async function compare(src: string | Function, context?: BasicContext): P
   let finalSrc = typeof src === 'string' ? src : funcify(src);
   try {
     interpreter.load(parseScript(finalSrc));
-    // const result = await interpreter.stepInteractive();
-    const result = await interpreter.run();
+    // const result = interpreter.stepInteractive();
+    const result = interpreter.run();
     interpreterActualValue = result;
   } catch (e) {
     interpreterActualError = e;

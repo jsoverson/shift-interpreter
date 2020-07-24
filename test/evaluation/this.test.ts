@@ -5,12 +5,12 @@ import {assertResult, compare} from '../util';
 chai.use(spies);
 
 describe('this', () => {
-  it('should refer to local context', async () => {
+  it('should refer to local context', () => {
     const context = {global: {}, console};
     context.global = context;
 
     assertResult(
-      await compare(`
+      compare(`
       const c = {
         a : function() {return this.b},
         b : "Hello"
@@ -19,12 +19,12 @@ describe('this', () => {
     `),
     );
   });
-  it('should support dynamic context', async () => {
+  it('should support dynamic context', () => {
     const context = {global: {}, console};
     context.global = context;
 
     assertResult(
-      await compare(`
+      compare(`
     const outer = {
       inner: {
         innerFn() {

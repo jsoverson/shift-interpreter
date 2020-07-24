@@ -42,11 +42,11 @@ import {
 import {InterpreterRuntimeError} from './errors';
 import {Interpreter} from './interpreter';
 import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
-import {InterpreterContext} from './context';
 import DEBUG from 'debug';
 import {RuntimeValue} from './runtime-value';
 import {isIntermediaryFunction, isGetterInternal, toString} from './util';
 import * as codegen from 'shift-printer';
+import {BasicContext} from './context';
 
 export interface DynamicClass {
   [key: string]: any;
@@ -79,7 +79,7 @@ export class NodeHandler {
   }
 
   async FunctionDeclaration(decl: FunctionDeclaration) {
-    const variables = this.interpreter.scopeLookup.get(decl.name);
+    const variables = this.interpreter.lookupTable.variableMap.get(decl.name);
 
     if (variables.length > 1) throw new Error('reproduce this and handle it better');
     const variable = variables[0];
@@ -166,7 +166,7 @@ export class NodeHandler {
       Class[name] = intermediateFunction;
     });
 
-    const variables = this.interpreter.scopeLookup.get(decl.name);
+    const variables = this.interpreter.lookupTable.variableMap.get(decl.name);
 
     variables.forEach((variable: any) => this.interpreter.variableMap.set(variable, RuntimeValue.wrap(Class)));
 
@@ -629,8 +629,9 @@ export class NodeHandler {
 
   async ArrowExpression(expr: ArrowExpression) {
     const interpreter = this.interpreter;
+    const currentContext = interpreter.getCurrentContext();
 
-    return function(this: InterpreterContext) {
+    return function(this: BasicContext) {
       const arrowFn = async (...args: any) => {
         interpreter.pushContext(this);
         for (let i = 0; i < expr.params.items.length; i++) {
@@ -649,7 +650,7 @@ export class NodeHandler {
       };
       Object.assign(arrowFn, {_interp: true});
       return arrowFn;
-    }.bind(interpreter.getCurrentContext())();
+    }.bind(currentContext)();
   }
   async FunctionExpression(expr: FunctionExpression) {
     return this.interpreter.createFunction(expr);

@@ -2,8 +2,12 @@ import {parseScript} from 'shift-parser';
 import {Interpreter} from '../../src/interpreter';
 import {ExpressionStatement} from 'shift-ast';
 import chai from 'chai';
+import {assertResult, compare} from '../util';
 
 describe('ExoticScenarios', () => {
+  it('what', async () => {
+    assertResult(await compare(`'();'.replace('()', function(){})`));
+  });
   it('should allow piecemeal execution', async () => {
     const source = `
     (function() {
@@ -65,12 +69,12 @@ describe('ExoticScenarios', () => {
     // @ts-ignore
     await interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
     await interpreter.evaluateStatement(
-    // @ts-ignore
-    tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
+      // @ts-ignore
+      tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
     );
     const v = interpreter
       .getRuntimeValue(
-    // @ts-ignore
+        // @ts-ignore
         tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration
           .declarators[0].binding,
       )

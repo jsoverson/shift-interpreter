@@ -11,11 +11,18 @@ describe('Functions', () => {
   it('should hoist functions for purposes of member access/assignment', async () => {
     assertResult(await compare("a.foo = 'bar'; function a(){}; a.foo;"));
   });
+
+  it('should call methods on primitive literals', async () => {
+    assertResult(await compare("'a'.replace('a','b');"));
+  });
+  it('should call methods on primitive return values', async () => {
+    assertResult(await compare("fn = () => 'a';fn().replace('a','b');"));
+  });
   it('should assign arrow expressions', async () => {
     assertResult(await compare('let a = (a) => {return a}; a(4)'));
   });
   it('arrow expressions should retain `this` binding', async () => {
-    assertResult(await compare('let a = { a: () => {return this.b}, b: 44 }; const b = a.a; a.a() + b();'));
+    assertResult(await compare('let a = { a: () => {return this.b}, b: 44 }; const b = a.a; b();'));
   });
   it('should evaluate shorthand arrow expressions', async () => {
     assertResult(await compare('let a = _ => _ + 10; a(2);'));

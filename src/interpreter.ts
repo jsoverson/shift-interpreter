@@ -12,10 +12,11 @@ import {
   VariableDeclaration,
   VariableDeclarationStatement,
   EmptyStatement,
+  ArrayExpression,
 } from 'shift-ast';
 import * as codegen from 'shift-printer';
-import shiftScope, {ScopeLookup, Variable} from 'shift-scope';
-import {InterpreterContext} from './context';
+import shiftScope, {ScopeLookup, Variable, Scope} from 'shift-scope';
+import {BasicContext, proxyContext} from './context';
 import {InterpreterRuntimeError} from './errors';
 import {NodeHandler} from './node-handler';
 import {BlockType, InstructionNode, FuncType, Identifier, Loop} from './types';
@@ -28,6 +29,7 @@ import {EventEmitter} from 'events';
 import {inspect} from 'util';
 import {Breakpoint, NodeBreakpoint} from './breakpoint';
 import {waterfallMap} from './waterfall';
+import sp from 'synchronized-promise';
 
 const debug = DEBUG('shift:interpreter');
 
@@ -69,17 +71,18 @@ export class InterpreterBreakEvent extends InterpreterEvent {
 }
 
 export class Interpreter extends EventEmitter {
-  contexts: InterpreterContext[] = [{}];
-  globalScope: any;
-  scopeLookup: any;
+  contexts: BasicContext[] = [];
+  globalScope: Scope = shiftScope(new Script({directives: [], statements: []}));
+  lookupTable: ScopeLookup = new ScopeLookup(this.globalScope);
+  scopeMap: WeakMap<Variable, Scope> = new WeakMap();
+  scopeOwnerMap: WeakMap<Node, Scope> = new WeakMap();
   variableMap = new Map<Variable, RuntimeValue<any>>();
   options: Options;
   loadedScript: Script = new Script({directives: [], statements: []});
   handler: NodeHandler;
+  contextProxies = new WeakMap<typeof Proxy, any>();
   pointer = new InstructionBuffer();
   breakpoints: Breakpoint[] = [];
-
-  argumentsMap = new WeakMap();
   currentLoops: Loop[] = [];
   lastStatement: Statement = new EmptyStatement();
   lastInstruction: Instruction = new Instruction(new EmptyStatement(), -1);
@@ -106,10 +109,6 @@ export class Interpreter extends EventEmitter {
     return codegen.prettyPrint(node || this.lastInstruction.node);
   }
 
-  // debug(state: boolean = true) {
-  //   debug.enabled = true;
-  // }
-
   logNode(node: Node) {
     codegen.log(node);
   }
@@ -126,17 +125,47 @@ export class Interpreter extends EventEmitter {
   load(script: Script) {
     debug('loading script');
     this.globalScope = shiftScope(script);
-    this.scopeLookup = new ScopeLookup(this.globalScope).variableMap;
+    this.lookupTable = new ScopeLookup(this.globalScope);
+    this.buildScopeMap();
     this.loadedScript = script;
     this.hasStarted = false;
   }
 
-  pushContext(context: InterpreterContext) {
+  private buildScopeMap() {
+    const lookupTable = this.lookupTable;
+    this.scopeMap = new WeakMap();
+    // this.variables = new Set();
+    const recurse = (scope: Scope) => {
+      this.scopeOwnerMap.set(scope.astNode, scope);
+      scope.variableList.forEach((variable: Variable) => {
+        // this.variables.add(variable);
+        this.scopeMap.set(variable, scope);
+      });
+      scope.children.forEach(recurse);
+    };
+    recurse(lookupTable.scope);
+  }
+
+  pushContext(context: any) {
     this.contexts.push(context);
   }
 
   popContext() {
     return this.contexts.pop();
+  }
+
+  getCurrentContext() {
+    if (this.contexts.length === 0) {
+      debug('interpreter created with no context, creating empty context.');
+      this.pushContext({});
+    }
+    const context = this.contexts[this.contexts.length - 1];
+    if (context === undefined) return this.contexts[0];
+    return context;
+  }
+
+  getContexts() {
+    return this.contexts;
   }
 
   async run(passedNode?: InstructionNode): Promise<RuntimeValue<any>> {
@@ -301,7 +330,6 @@ exit, quit, q: quit
     return result;
   }
   async evaluateNext(node: InstructionNode | null): Promise<RuntimeValue<any>> {
-    if (!this.contexts) throw new Error('No contexts defined');
     if (node === null) {
       return Promise.resolve(new RuntimeValue(undefined));
     } else {
@@ -327,7 +355,6 @@ exit, quit, q: quit
     return this.handler[expr.type](expr);
   }
   evaluateStatement(stmt: Statement): any {
-    if (!this.contexts) return;
     this.lastStatement = stmt;
     return this.handler[stmt.type](stmt);
   }
@@ -422,9 +449,13 @@ exit, quit, q: quit
       [name]: function(this: any, ...args: any): any {
         fnDebug(`calling intermediary ${node.type} ${name}`);
         interpreter.pushContext(this);
-        interpreter.argumentsMap.set(this, arguments);
+        const scope = interpreter.scopeOwnerMap.get(node);
+        if (scope) {
+          const argsRef = scope.variables.get('arguments');
+          if (argsRef) interpreter.setRuntimeValue(argsRef, arguments);
+        }
 
-        function bindParams() {
+        function bindParams(): Promise<void | void[]> {
           if (node.type === 'Getter') {
             return Promise.resolve();
           } else if (node.type === 'Setter') {
@@ -441,9 +472,7 @@ exit, quit, q: quit
           }
         }
 
-        // Track https://github.com/microsoft/TypeScript/issues/36307 PR: https://github.com/microsoft/TypeScript/pull/31023
         const interpreterPromise = bindParams()
-          //@ts-ignore
           .then(() => {
             fnDebug('evaluating function body');
           })
@@ -480,12 +509,12 @@ exit, quit, q: quit
     switch (binding.type) {
       case 'BindingIdentifier':
         {
-          const variables = this.scopeLookup.get(binding);
+          const variables = this.lookupTable.variableMap.get(binding);
 
           if (variables.length > 1) throw new Error('reproduce this and handle it better');
           const variable = variables[0];
           _debug(`binding ${binding.name} to ${init.unwrap()}`);
-          this.variableMap.set(variable, init);
+          this.setRuntimeValue(variable, init);
         }
         break;
       case 'ArrayBinding':
@@ -533,17 +562,20 @@ exit, quit, q: quit
     }
   }
   updateVariableValue(node: Identifier, value: any) {
-    const variables = this.scopeLookup.get(node);
+    const variables = this.lookupTable.variableMap.get(node);
 
     if (variables.length > 1) throw new Error('reproduce this and handle it better');
     const variable = variables[0];
     this.variableMap.set(variable, RuntimeValue.wrap(value));
     return value;
   }
+  setRuntimeValue(variable: Variable, value: any) {
+    this.variableMap.set(variable, value);
+  }
   getRuntimeValue(node: Identifier): any {
     const _debug = debug.extend('getVariableValue');
     _debug(`retrieving value for ${node.name}`);
-    const variables = this.scopeLookup.get(node);
+    const variables = this.lookupTable.variableMap.get(node);
 
     if (!variables) {
       throw new Error(`${node.type} variable not found. Make sure you are passing a valid Identifier node.`);
@@ -559,21 +591,14 @@ exit, quit, q: quit
       const value = this.variableMap.get(variable);
       return RuntimeValue.wrap(value);
     } else {
-      if (node.name === 'arguments') {
-        if (this.argumentsMap.has(this.getCurrentContext())) {
-          return this.argumentsMap.get(this.getCurrentContext());
-        }
-      }
-      for (let i = this.contexts.length - 1; i > -1; i--) {
+      const contexts = this.getContexts();
+      for (let i = contexts.length - 1; i > -1; i--) {
         if (variable.name in this.contexts[i]) {
-          const value = this.contexts[i][variable.name];
+          const value = contexts[i][variable.name];
           return RuntimeValue.wrap(value);
         }
       }
       throw new ReferenceError(`${node.name} is not defined`);
     }
-  }
-  getCurrentContext() {
-    return this.contexts[this.contexts.length - 1];
   }
 }

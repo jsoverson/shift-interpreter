@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 import {parseScript} from 'shift-parser';
 import {Interpreter} from '../src/interpreter';
-import {InterpreterContext} from '../src/context';
+import {BasicContext} from '../src/context';
 
 import DEBUG from 'debug';
 import {RuntimeValue} from '../src';
@@ -54,7 +54,7 @@ function funcify(fn: Function) {
   return `(${src})()`;
 }
 
-export async function compare(src: string | Function, context?: InterpreterContext): Promise<Result> {
+export async function compare(src: string | Function, context?: BasicContext): Promise<Result> {
   const interpreter = new Interpreter();
   if (context) interpreter.pushContext(context);
   let nativeExpectedValue, nativeExpectedError;

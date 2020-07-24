@@ -1,13 +1,11 @@
-
-declare module "shift-scope" {
-
+declare module 'shift-scope' {
   export class ScopeLookup {
     scope: GlobalScope;
-    variableMap: import("multimap");
+    variableMap: import('multimap');
     constructor(globalScope: GlobalScope);
-    
-    lookup(node: import("shift-ast").Node): Variable;
-  
+
+    lookup(node: import('shift-ast').Node): Variable;
+
     isGlobal(node: Scope): node is GlobalScope;
   }
 
@@ -15,7 +13,7 @@ declare module "shift-scope" {
     name: string;
     isBlockScoped: boolean;
     isFunctionScoped: boolean;
-  
+
     constructor(name: string, isBlockScoped: boolean);
     static VAR: FunctionScopedDeclaration;
     static CONST: BlockScopedDeclaration;
@@ -30,24 +28,23 @@ declare module "shift-scope" {
     static IMPORT: BlockScopedDeclaration;
     static fromVarDeclKind: (variableDeclarationKind: string) => FunctionScopedDeclaration | BlockScopedDeclaration;
   }
-  
+
   export class BlockScopedDeclaration extends DeclarationType {
     constructor(name: string);
   }
-  
+
   export class FunctionScopedDeclaration extends DeclarationType {
     constructor(name: string);
   }
- 
+
   export class Declaration {
-    node: import("shift-ast").BindingIdentifier | import("shift-ast").AssignmentTargetIdentifier;
+    node: import('shift-ast').BindingIdentifier | import('shift-ast').AssignmentTargetIdentifier;
     type: DeclarationType;
-  
-    constructor(node: import("shift-ast").Node, type: DeclarationType);
+
+    constructor(node: import('shift-ast').Node, type: DeclarationType);
   }
 
-
-  export default function analyze(script: import("shift-ast").Node): Scope;
+  export default function analyze(script: import('shift-ast').Node): Scope;
 
   export class Accessibility {
     isRead: boolean;
@@ -55,28 +52,48 @@ declare module "shift-scope" {
     isDelete: boolean;
     isReadWrite: boolean;
 
-    constructor(isRead: boolean, isWrite: boolean, isDelete: boolean)
+    constructor(isRead: boolean, isWrite: boolean, isDelete: boolean);
 
     static READ: Accessibility;
     static WRITE: Accessibility;
     static READWRITE: Accessibility;
     static DELETE: Accessibility;
   }
-  
+
   export class Reference {
-    node: import("shift-ast").IdentifierExpression | import("shift-ast").AssignmentTargetIdentifier | import("shift-ast").BindingIdentifier;
+    node:
+      | import('shift-ast').IdentifierExpression
+      | import('shift-ast').AssignmentTargetIdentifier
+      | import('shift-ast').BindingIdentifier;
     accessibility: Accessibility;
-    constructor(node:import("shift-ast").Node, accessibility: Accessibility);
+    constructor(node: import('shift-ast').Node, accessibility: Accessibility);
   }
-  
-  export enum ScopeType {
+
+  export class ScopeType<ScopeDefinition> {
+    name: ScopeDefinition;
+    constructor(name: ScopeDefinition);
+    static GLOBAL: ScopeType<ScopeDefinition.GLOBAL>;
+    static MODULE: ScopeType<ScopeDefinition.MODULE>;
+    static SCRIPT: ScopeType<ScopeDefinition.SCRIPT>;
+    static ARROW_FUNCTION: ScopeType<ScopeDefinition.ARROW_FUNCTION>;
+    static FUNCTION: ScopeType<ScopeDefinition.FUNCTION>;
+    static FUNCTION_NAME: ScopeType<ScopeDefinition.FUNCTION_NAME>;
+    static CLASS_NAME: ScopeType<ScopeDefinition.CLASS_NAME>;
+    static PARAMETERS: ScopeType<ScopeDefinition.PARAMETERS>;
+    static PARAMETER_EXPRESSION: ScopeType<ScopeDefinition.PARAMETER_EXPRESSION>;
+    static WITH: ScopeType<ScopeDefinition.WITH>;
+    static CATCH: ScopeType<ScopeDefinition.CATCH>;
+    static BLOCK: ScopeType<ScopeDefinition.BLOCK>;
+  }
+
+  export enum ScopeDefinition {
     GLOBAL = 'Global',
     MODULE = 'Module',
     SCRIPT = 'Script',
     ARROW_FUNCTION = 'ArrowFunction',
     FUNCTION = 'Function',
-    FUNCTION_NAME = 'FunctionName', // named function expressio,
-    CLASS_NAME = 'ClassName', // named class expressio,
+    FUNCTION_NAME = 'FunctionName',
+    CLASS_NAME = 'ClassName',
     PARAMETERS = 'Parameters',
     PARAMETER_EXPRESSION = 'ParameterExpression',
     WITH = 'With',
@@ -86,21 +103,18 @@ declare module "shift-scope" {
 
   export class Scope {
     children: Scope[];
-    through:import("multimap");
-    type: ScopeType;
-    astNode: import("shift-ast").Node;
+    through: import('multimap');
+    type: ScopeType<ScopeDefinition>;
+    astNode: import('shift-ast').Node;
     variables: Map<string, Variable>;
     variableList: Variable[];
     dynamic: boolean;
     constructor(scope: Scope);
   }
-  export class GlobalScope extends Scope {
-
-  }
+  export class GlobalScope extends Scope {}
   export class Variable {
     name: string;
     references: Reference[];
     declarations: Declaration[];
   }
-
 }

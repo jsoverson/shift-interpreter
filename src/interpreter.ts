@@ -1,8 +1,11 @@
 import chalk from 'chalk';
+import DEBUG from 'debug';
+import {EventEmitter} from 'events';
 import {
   ArrayBinding,
   BindingIdentifier,
   BindingWithDefault,
+  EmptyStatement,
   Expression,
   Node,
   ObjectBinding,
@@ -11,25 +14,20 @@ import {
   Super,
   VariableDeclaration,
   VariableDeclarationStatement,
-  EmptyStatement,
-  ArrayExpression,
 } from 'shift-ast';
 import * as codegen from 'shift-printer';
-import shiftScope, {ScopeLookup, Variable, Scope} from 'shift-scope';
-import {BasicContext, proxyContext} from './context';
-import {InterpreterRuntimeError} from './errors';
-import {NodeHandler} from './node-handler';
-import {BlockType, InstructionNode, FuncType, Identifier, Loop} from './types';
-import {createReadlineInterface, isStatement, isBlockType, isIntermediaryFunction} from './util';
-import DEBUG from 'debug';
-import {Instruction} from './instruction';
-import {InstructionBuffer, InstructionBufferEventName} from './instruction-buffer';
-import {RuntimeValue} from './runtime-value';
-import {EventEmitter} from 'events';
+import shiftScope, {Scope, ScopeLookup, Variable} from 'shift-scope';
 import {inspect} from 'util';
 import {Breakpoint, NodeBreakpoint} from './breakpoint';
+import {BasicContext} from './context';
+import {InterpreterRuntimeError} from './errors';
+import {Instruction} from './instruction';
+import {InstructionBuffer, InstructionBufferEventName} from './instruction-buffer';
+import {NodeHandler} from './node-handler';
+import {RuntimeValue} from './runtime-value';
+import {BlockType, FuncType, Identifier, InstructionNode, Loop} from './types';
+import {createReadlineInterface, isBlockType, isIntermediaryFunction, isStatement} from './util';
 import {waterfallMap} from './waterfall';
-import sp from 'synchronized-promise';
 
 const debug = DEBUG('shift:interpreter');
 

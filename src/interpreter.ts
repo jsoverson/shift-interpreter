@@ -14,23 +14,19 @@ import {
   Super,
   VariableDeclaration,
   VariableDeclarationStatement,
-  FunctionDeclaration,
 } from 'shift-ast';
 import * as codegen from 'shift-printer';
 import shiftScope, {Scope, ScopeLookup, Variable} from 'shift-scope';
-import {inspect} from 'util';
 import {Breakpoint, NodeBreakpoint} from './breakpoint';
 import {BasicContext} from './context';
 import {InterpreterRuntimeError} from './errors';
 import {Instruction} from './instruction';
 import {InstructionBuffer, InstructionBufferEventName} from './instruction-buffer';
 import {NodeHandler} from './node-handler';
-import {BlockType, FuncType, Identifier, InstructionNode, Loop} from './types';
-import {createReadlineInterface, isBlockType, isIntermediaryFunction, isStatement} from './util';
-import {waterfallMap} from './waterfall';
-import {interpret} from '.';
+import {BlockType, FuncType, Identifier, InstructionNode} from './types';
+import {isBlockType, isStatement} from './util';
 
-const debug = DEBUG('shift:interpreter');
+const debug = DEBUG('shift-interpreter');
 
 interface Options {
   skipUnsupported?: boolean;
@@ -217,8 +213,7 @@ export class Interpreter extends EventEmitter {
     try {
       programResult = this.evaluateNext(nodeToEvaluate);
       this.emit(InterpreterEventName.COMPLETE, new InterpreterCompleteEvent(programResult));
-      debug(`completed execution with result: ${programResult}`);
-
+      debug(`completed execution with result: %o`, programResult);
       return programResult;
     } catch (e) {
       this.handleError(e);
@@ -352,7 +347,7 @@ export class Interpreter extends EventEmitter {
         debug(`no instruction to evaluate, returning`);
         return;
       }
-      debug(`evaluating instruction (${this.lastInstruction.node.type}->${node.type})`);
+      debug(`evaluating instruction from %o -> %o`, this.lastInstruction.node.type, node.type);
       try {
         return this.evaluateInstruction(instruction);
       } catch (e) {
@@ -382,7 +377,7 @@ export class Interpreter extends EventEmitter {
   }
   hoistFunctions(block: BlockType) {
     const functions = block.statements.filter(s => s.type === 'FunctionDeclaration');
-    if (functions.length) debug(`hoisting ${functions.length} functions in ${block.type}`);
+    if (functions.length) debug(`hoisting %o functions in %o`, functions.length, block.type);
     for (let fnDecl of functions) {
       this.evaluateNext(fnDecl);
     }
@@ -394,7 +389,7 @@ export class Interpreter extends EventEmitter {
         <(T: Statement) => T is VariableDeclarationStatement>(stmt => stmt.type === 'VariableDeclarationStatement'),
       )
       .filter((decl: VariableDeclarationStatement) => decl.declaration.kind === 'var');
-    if (vars.length) debug(`hoisting ${vars.length} vars in ${block.type}`);
+    if (vars.length) debug(`hoisting %o var statements in %o`, vars.length, block.type);
     for (let varDecl of vars) {
       for (let declarator of varDecl.declaration.declarators) this.bindVariable(declarator.binding, undefined);
     }
@@ -422,7 +417,7 @@ export class Interpreter extends EventEmitter {
       }
     }
 
-    _debug(`creating intermediary ${node.type} ${name}`);
+    _debug(`creating intermediary %o: %o`, node.type, name);
 
     const interpreter = this;
 
@@ -436,7 +431,7 @@ export class Interpreter extends EventEmitter {
     // allows us to create a named function by inferring the name from the property value.
     fn = {
       [name]: function(this: any, ...args: any): any {
-        fnDebug(`calling intermediary ${node.type} ${name}`);
+        fnDebug(`calling intermediary %o: %o`, node.type, name);
         interpreter.pushContext(this);
         const scope = interpreter.scopeOwnerMap.get(node);
         if (scope) {
@@ -452,7 +447,7 @@ export class Interpreter extends EventEmitter {
         } else {
           node.params.items.forEach(
             (el: ArrayBinding | BindingIdentifier | BindingWithDefault | ObjectBinding, i: number) => {
-              fnDebug(`binding function argument ${i + 1}`);
+              fnDebug(`binding function argument %o`, i + 1);
               return interpreter.bindVariable(el, args[i]);
             },
           );
@@ -483,7 +478,6 @@ export class Interpreter extends EventEmitter {
 
   bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
     const _debug = debug.extend('bindVariable');
-    _debug(`${binding.type} => ${init}`);
     switch (binding.type) {
       case 'BindingIdentifier':
         {
@@ -491,7 +485,7 @@ export class Interpreter extends EventEmitter {
 
           if (variables.length > 1) throw new Error('reproduce this and handle it better');
           const variable = variables[0];
-          _debug(`binding ${binding.name} to ${init}`);
+          _debug(`binding %o to %o`, binding.name, init);
           this.setRuntimeValue(variable, init);
         }
         break;

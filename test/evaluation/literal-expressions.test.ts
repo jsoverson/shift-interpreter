@@ -36,7 +36,15 @@ describe('Literals', () => {
       // should it though? Deferring support until I run across them in a script I care about.
     });
   });
-  it('should evaluate LiteralRegExpExpression', () => {
-    assertResult(compare(`"abcd".match(/abcd/)[0] === 'abcd';`));
+  describe('regexes', () => {
+    it('should be able to pass LiteralRegExpExpressions to string methods', () => {
+      assertResult(compare(`"abcd".match(/abcd/)[0] === 'abcd';`));
+    });
+    it('LiteralRegExpExpressions should be executable as expected', () => {
+      assertResult(compare(`/ab/.exec("abcd")`));
+    });
+    it('should be able to store LiteralRegExpExpressions', () => {
+      assertResult(compare(`var a = /ab/; a.exec("abcd")`));
+    });
   });
 });

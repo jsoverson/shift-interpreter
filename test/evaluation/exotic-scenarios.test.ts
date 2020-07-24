@@ -72,13 +72,11 @@ describe('ExoticScenarios', () => {
       // @ts-ignore
       tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
     );
-    const v = interpreter
-      .getRuntimeValue(
-        // @ts-ignore
-        tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration
-          .declarators[0].binding,
-      )
-      .unwrap();
+    const v = interpreter.getRuntimeValue(
+      // @ts-ignore
+      tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0].declaration
+        .declarators[0].binding,
+    );
     chai.expect(v).to.deep.equal(['3', '4', '2', '1', '0']);
   });
 });

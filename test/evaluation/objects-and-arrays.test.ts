@@ -1,7 +1,7 @@
 import {assertResult, compare} from '../util';
 
 describe('Objects', () => {
-  it('should not interferes with promises', async () => {
+  it('should not interfere with external promises', async () => {
     //@ts-ignore
     const outer = (global.outer = new Promise(res => {
       res(22);
@@ -39,6 +39,6 @@ describe('Arrays', () => {
     assertResult(await compare('let a = [1,2,3,4]; a[3];'));
   });
   it('should parse array expressions with spread', async () => {
-    assertResult(await compare('let a = [1,2,3,4], b = [...a];'));
+    assertResult(await compare('let a = [1,2,3,4], b = [...a];b'));
   });
 });

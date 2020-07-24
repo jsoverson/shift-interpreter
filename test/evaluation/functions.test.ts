@@ -1,7 +1,7 @@
 import chai from 'chai';
 import {assertResult, compare} from '../util';
 import {parseScript} from 'shift-parser';
-import {Interpreter, interpret, RuntimeValue} from '../../src';
+import {Interpreter, interpret} from '../../src';
 import {FunctionDeclaration, AssignmentExpression} from 'shift-ast';
 
 describe('Functions', () => {
@@ -109,8 +109,8 @@ describe('Functions', () => {
     const fnDecl = ast.statements.find(st => st.type === 'FunctionDeclaration') as FunctionDeclaration;
 
     const fn = () => {
-      const value = interpreter.getRuntimeValue(fnDecl.name).unwrap();
-      chai.expect(value.b.unwrap()).to.equal(2);
+      const value = interpreter.getRuntimeValue(fnDecl.name);
+      chai.expect(value.b).to.equal(2);
     };
     chai.expect(fn).to.not.throw();
   });
@@ -159,7 +159,7 @@ describe('Getters/Setters', () => {
     const objectExpression = tree.statements[0].expression as AssignmentExpression;
     const interpreter = new Interpreter();
     interpreter.load(tree);
-    const obj = RuntimeValue.unwrap(await interpreter.evaluateNext(objectExpression));
+    const obj = await interpreter.evaluateNext(objectExpression);
     obj.property = 22;
     chai.expect(obj._secretProp).to.equal(22);
   });

@@ -18,4 +18,3 @@ export default interpretSource;
 export const interpret = interpretSource;
 
 export {Interpreter} from './interpreter';
-export {RuntimeValue} from './runtime-value';

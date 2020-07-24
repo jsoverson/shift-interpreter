@@ -15,6 +15,6 @@ describe('Script', () => {
       .binding as BindingIdentifier;
     const value = interpreter.getRuntimeValue(id);
 
-    chai.expect(value.unwrap()).to.equal(22);
+    chai.expect(value).to.equal(22);
   });
 });

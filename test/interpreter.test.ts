@@ -10,7 +10,7 @@ describe('interpreter', () => {
     const interpreter = new Interpreter();
     await interpreter.run(ast);
     //@ts-ignore
-    const value = interpreter.getRuntimeValue(ast.statements[0].declaration.declarators[0].binding).unwrap();
+    const value = interpreter.getRuntimeValue(ast.statements[0].declaration.declarators[0].binding);
     chai.expect(value).to.equal(2);
   });
   it('should step through execution', async () => {
@@ -37,12 +37,12 @@ describe('interpreter', () => {
     await interpreter.step();
     await interpreter.step();
     await interpreter.step();
-    let idVal = interpreter.getRuntimeValue(identifier).unwrap();
+    let idVal = interpreter.getRuntimeValue(identifier);
     chai.expect(idVal).to.equal(2);
     await interpreter.step();
     await interpreter.step();
     await interpreter.step();
-    idVal = interpreter.getRuntimeValue(identifier).unwrap();
+    idVal = interpreter.getRuntimeValue(identifier);
     chai.expect(idVal).to.equal(4);
   });
   it('should break at specified node', async () => {
@@ -59,11 +59,11 @@ describe('interpreter', () => {
     let completed = false;
     completionPromise.then(x => (completed = true));
     await interpreter.run();
-    let idVal = interpreter.getRuntimeValue(identifier).unwrap();
+    let idVal = interpreter.getRuntimeValue(identifier);
     chai.expect(idVal).to.equal(2);
     chai.expect(completed).to.be.false;
     await interpreter.continue();
-    idVal = interpreter.getRuntimeValue(identifier).unwrap();
+    idVal = interpreter.getRuntimeValue(identifier);
     chai.expect(idVal).to.equal(4);
     chai.expect(completed).to.be.true;
   });

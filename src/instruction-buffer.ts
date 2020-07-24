@@ -19,7 +19,7 @@ export class InstructionBuffer extends EventEmitter {
   private wasPaused = false;
 
   add(node: InstructionNode): Instruction {
-    debug(`queuing: ${codegen.printTruncated(node).trim()}`);
+    // debug(`queuing: ${codegen.printTruncated(node).trim()}`);
     const instruction = new Instruction(node, this.numInstructions++);
     this.buffer.push(instruction);
     return instruction;
@@ -30,13 +30,13 @@ export class InstructionBuffer extends EventEmitter {
   continue(options: {force: boolean} = {force: false}) {
     if (!options.force) {
       if (this.isPaused) {
-        debug('paused, ignoring continue request');
+        // debug('paused, ignoring continue request');
         if (!this.wasPaused) {
           this.emit(InstructionBufferEventName.HALT, this.buffer[0]);
         }
         return;
       } else if (!this.wasPaused) {
-        debug(`triggering next instruction`);
+        // debug(`triggering next instruction`);
         this.emit(InstructionBufferEventName.CONTINUE, this.buffer[0]);
       }
     }
@@ -61,7 +61,7 @@ export class InstructionBuffer extends EventEmitter {
   awaitExecution(): Promise<Instruction> {
     const promise: Promise<Instruction> = new Promise((resolve, reject) => {
       this.onNext(instruction => {
-        debug(`continuing execution with:${instruction.node.type}: ${codegen.printTruncated(instruction.node).trim()}`);
+        // debug(`continuing execution with:${instruction.node.type}: ${codegen.printTruncated(instruction.node).trim()}`);
         resolve(instruction);
       });
     });

@@ -2,9 +2,9 @@ import {expect} from 'chai';
 import {parseScript} from 'shift-parser';
 import {Interpreter} from '../src/interpreter';
 import {BasicContext} from '../src/context';
+import deepEqual from 'deep-equal';
 
 import DEBUG from 'debug';
-import {RuntimeValue} from '../src';
 
 const debug = DEBUG('shift:interpreter:test');
 
@@ -70,7 +70,7 @@ export async function compare(src: string | Function, context?: BasicContext): P
     interpreter.load(parseScript(finalSrc));
     // const result = await interpreter.stepInteractive();
     const result = await interpreter.run();
-    interpreterActualValue = RuntimeValue.unwrap(result);
+    interpreterActualValue = result;
   } catch (e) {
     interpreterActualError = e;
   }
@@ -99,7 +99,7 @@ export async function compare(src: string | Function, context?: BasicContext): P
       console.log(interpreterActualError);
       success = false;
     } else {
-      success = nativeExpectedValue === interpreterActualValue;
+      success = deepEqual(nativeExpectedValue, interpreterActualValue);
     }
   }
 

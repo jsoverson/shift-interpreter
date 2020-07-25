@@ -5,7 +5,7 @@ import {assertResult, compare} from '../util';
 
 function evaluate(expr: Expression) {
   const interpreter = new Interpreter();
-  return interpreter.evaluateExpression(expr);
+  return interpreter.evaluate(expr);
 }
 
 describe('Literals', () => {

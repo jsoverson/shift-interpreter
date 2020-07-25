@@ -66,20 +66,20 @@ export class NodeHandler {
   }
 
   ReturnStatement(stmt: ReturnStatement) {
-    const value = this.interpreter.evaluateNext(stmt.expression);
+    const value = this.interpreter.evaluate(stmt.expression);
     this.interpreter.isReturning(true);
     return value;
   }
 
   ExpressionStatement(stmt: ExpressionStatement) {
-    return this.interpreter.evaluateNext(stmt.expression);
+    return this.interpreter.evaluate(stmt.expression);
   }
   VariableDeclarationStatement(stmt: VariableDeclarationStatement) {
     return this.interpreter.declareVariables(stmt.declaration);
   }
 
   VariableDeclarator(declarator: VariableDeclarator) {
-    const value = this.interpreter.evaluateNext(declarator.init);
+    const value = this.interpreter.evaluate(declarator.init);
     return this.interpreter.bindVariable(declarator.binding, value);
   }
 
@@ -95,7 +95,7 @@ export class NodeHandler {
   }
 
   BlockStatement(stmt: BlockStatement) {
-    return this.interpreter.evaluateNext(stmt.block);
+    return this.interpreter.evaluate(stmt.block);
   }
 
   ClassDeclaration(decl: ClassDeclaration) {
@@ -122,7 +122,7 @@ export class NodeHandler {
     let Class: DynamicClass = class {};
 
     if (decl.super) {
-      const xtends = this.interpreter.evaluateNext(decl.super);
+      const xtends = this.interpreter.evaluate(decl.super);
       Class = ((SuperClass: any = xtends) => {
         if (constructor === null) {
           class InterpreterClassWithExtendsA extends SuperClass {
@@ -179,30 +179,30 @@ export class NodeHandler {
   }
 
   IfStatement(stmt: IfStatement) {
-    const test = this.interpreter.evaluateNext(stmt.test);
-    if (test) return this.interpreter.evaluateNext(stmt.consequent);
-    else if (stmt.alternate) return this.interpreter.evaluateNext(stmt.alternate);
+    const test = this.interpreter.evaluate(stmt.test);
+    if (test) return this.interpreter.evaluate(stmt.consequent);
+    else if (stmt.alternate) return this.interpreter.evaluate(stmt.alternate);
   }
 
   ConditionalExpression(stmt: ConditionalExpression) {
-    const test = this.interpreter.evaluateNext(stmt.test);
-    if (test) return this.interpreter.evaluateNext(stmt.consequent);
-    else if (stmt.alternate) return this.interpreter.evaluateNext(stmt.alternate);
+    const test = this.interpreter.evaluate(stmt.test);
+    if (test) return this.interpreter.evaluate(stmt.consequent);
+    else if (stmt.alternate) return this.interpreter.evaluate(stmt.alternate);
   }
 
   ThrowStatement(stmt: ThrowStatement) {
-    const error = this.interpreter.evaluateNext(stmt.expression);
+    const error = this.interpreter.evaluate(stmt.expression);
     throw error;
   }
 
   TryCatchStatement(stmt: TryCatchStatement) {
     let returnValue = undefined;
     try {
-      returnValue = this.interpreter.evaluateNext(stmt.body);
+      returnValue = this.interpreter.evaluate(stmt.body);
     } catch (e) {
       console.log(e);
       this.interpreter.bindVariable(stmt.catchClause.binding, e);
-      returnValue = this.interpreter.evaluateNext(stmt.catchClause.body);
+      returnValue = this.interpreter.evaluate(stmt.catchClause.body);
     }
     return returnValue;
   }
@@ -211,18 +211,18 @@ export class NodeHandler {
     let returnValue = undefined;
     if (stmt.catchClause) {
       try {
-        returnValue = this.interpreter.evaluateNext(stmt.body);
+        returnValue = this.interpreter.evaluate(stmt.body);
       } catch (e) {
         this.interpreter.bindVariable(stmt.catchClause.binding, e);
-        returnValue = this.interpreter.evaluateNext(stmt.catchClause.body);
+        returnValue = this.interpreter.evaluate(stmt.catchClause.body);
       } finally {
-        returnValue = this.interpreter.evaluateNext(stmt.finalizer);
+        returnValue = this.interpreter.evaluate(stmt.finalizer);
       }
     } else {
       try {
-        returnValue = this.interpreter.evaluateNext(stmt.body);
+        returnValue = this.interpreter.evaluate(stmt.body);
       } finally {
-        returnValue = this.interpreter.evaluateNext(stmt.finalizer);
+        returnValue = this.interpreter.evaluate(stmt.finalizer);
       }
     }
     return returnValue;
@@ -239,7 +239,7 @@ export class NodeHandler {
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i];
       _debug(`Evaluating next ${statement.type} in ${block.type}`);
-      value = this.interpreter.evaluateNext(statement);
+      value = this.interpreter.evaluate(statement);
       _debug(`${block.type} statement ${statement.type} completed`);
     }
     _debug(`completed ${block.type}, returning with: ${value}`);
@@ -257,7 +257,7 @@ export class NodeHandler {
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i];
       _debug(`Evaluating ${statement.type} in ${body.type}`);
-      value = this.interpreter.evaluateNext(statement);
+      value = this.interpreter.evaluate(statement);
       _debug(`${body.type} statement ${statement.type} completed`);
       if (this.interpreter.isReturning()) {
         break;
@@ -278,7 +278,7 @@ export class NodeHandler {
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i];
       _debug(`Evaluating ${statement.type} in ${body.type}`);
-      value = this.interpreter.evaluateNext(statement);
+      value = this.interpreter.evaluate(statement);
       _debug(`${body.type} statement ${statement.type} completed`);
     }
     _debug(`completed ${body.type}, returning with: ${value}`);
@@ -297,7 +297,7 @@ export class NodeHandler {
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i];
       _debug(`Evaluating ${statement.type} in ${stmt.type}`);
-      this.interpreter.evaluateNext(statement);
+      this.interpreter.evaluate(statement);
       _debug(`${stmt.type} statement ${statement.type} completed`);
       if (this.interpreter.isBreaking()) {
         break;
@@ -308,7 +308,7 @@ export class NodeHandler {
     }
   }
   ForOfStatement(stmt: ForOfStatement) {
-    const iterationExpression = this.interpreter.evaluateNext(stmt.right);
+    const iterationExpression = this.interpreter.evaluate(stmt.right);
     function* nextValue() {
       yield* iterationExpression;
     }
@@ -342,7 +342,7 @@ export class NodeHandler {
   }
 
   ForInStatement(stmt: ForInStatement) {
-    const iterationExpression = this.interpreter.evaluateNext(stmt.right);
+    const iterationExpression = this.interpreter.evaluate(stmt.right);
 
     switch (stmt.left.type) {
       case 'VariableDeclaration': {
@@ -386,15 +386,15 @@ export class NodeHandler {
   ForStatement(stmt: ForStatement) {
     if (stmt.init) {
       if (stmt.init.type === 'VariableDeclaration') this.interpreter.declareVariables(stmt.init);
-      else this.interpreter.evaluateNext(stmt.init);
+      else this.interpreter.evaluate(stmt.init);
     }
-    while (this.interpreter.evaluateNext(stmt.test)) {
+    while (this.interpreter.evaluate(stmt.test)) {
       this.loopBlock(stmt);
       if (this.interpreter.isBreaking()) {
         this.interpreter.isBreaking(false);
         break;
       }
-      if (stmt.update) this.interpreter.evaluateNext(stmt.update);
+      if (stmt.update) this.interpreter.evaluate(stmt.update);
       if (this.interpreter.isContinuing()) {
         this.interpreter.isContinuing(false);
         continue;
@@ -403,7 +403,7 @@ export class NodeHandler {
   }
 
   WhileStatement(stmt: WhileStatement) {
-    while (this.interpreter.evaluateNext(stmt.test)) {
+    while (this.interpreter.evaluate(stmt.test)) {
       this.loopBlock(stmt);
       if (this.interpreter.isContinuing()) {
         this.interpreter.isContinuing(false);
@@ -427,7 +427,7 @@ export class NodeHandler {
         this.interpreter.isBreaking(false);
         break;
       }
-    } while (this.interpreter.evaluateNext(stmt.test));
+    } while (this.interpreter.evaluate(stmt.test));
   }
 
   ThisExpression(expr: ThisExpression) {
@@ -435,14 +435,14 @@ export class NodeHandler {
   }
 
   NewExpression(expr: NewExpression) {
-    const newTarget = this.interpreter.evaluateNext(expr.callee);
+    const newTarget = this.interpreter.evaluate(expr.callee);
     const args: any[] = [];
     for (let arg of expr.arguments) {
       if (arg.type === 'SpreadElement') {
-        const value = this.interpreter.evaluateNext(arg.expression);
+        const value = this.interpreter.evaluate(arg.expression);
         args.push(...value);
       } else {
-        args.push(this.interpreter.evaluateNext(arg));
+        args.push(this.interpreter.evaluate(arg));
       }
     }
     let result = new newTarget(...args);
@@ -458,10 +458,10 @@ export class NodeHandler {
       if (el === null) {
         elements.push(null);
       } else if (el.type === 'SpreadElement') {
-        const iterable = this.interpreter.evaluateNext(el.expression);
+        const iterable = this.interpreter.evaluate(el.expression);
         elements.push(...Array.from(iterable));
       } else {
-        elements.push(this.interpreter.evaluateNext(el));
+        elements.push(this.interpreter.evaluate(el));
       }
     }
     return elements;
@@ -481,17 +481,13 @@ export class NodeHandler {
       switch (prop.type) {
         case 'DataProperty': {
           const name =
-            prop.name.type === 'StaticPropertyName'
-              ? prop.name.value
-              : this.interpreter.evaluateNext(prop.name.expression);
-          obj[name] = this.interpreter.evaluateNext(prop.expression);
+            prop.name.type === 'StaticPropertyName' ? prop.name.value : this.interpreter.evaluate(prop.name.expression);
+          obj[name] = this.interpreter.evaluate(prop.expression);
           break;
         }
         case 'Method': {
           const name =
-            prop.name.type === 'StaticPropertyName'
-              ? prop.name.value
-              : this.interpreter.evaluateNext(prop.name.expression);
+            prop.name.type === 'StaticPropertyName' ? prop.name.value : this.interpreter.evaluate(prop.name.expression);
           obj[name] = this.interpreter.createFunction(prop);
           break;
         }
@@ -502,18 +498,14 @@ export class NodeHandler {
         }
         case 'Getter': {
           const name =
-            prop.name.type === 'StaticPropertyName'
-              ? prop.name.value
-              : this.interpreter.evaluateNext(prop.name.expression);
+            prop.name.type === 'StaticPropertyName' ? prop.name.value : this.interpreter.evaluate(prop.name.expression);
           const operations = getPropertyDescriptors(name);
           operations.set('get', this.interpreter.createFunction(prop));
           break;
         }
         case 'Setter': {
           const name =
-            prop.name.type === 'StaticPropertyName'
-              ? prop.name.value
-              : this.interpreter.evaluateNext(prop.name.expression);
+            prop.name.type === 'StaticPropertyName' ? prop.name.value : this.interpreter.evaluate(prop.name.expression);
           const operations = getPropertyDescriptors(name);
           operations.set('set', this.interpreter.createFunction(prop));
           break;
@@ -538,15 +530,15 @@ export class NodeHandler {
 
   StaticMemberExpression(expr: StaticMemberExpression) {
     if (expr.object.type === 'Super') return this.interpreter.skipOrThrow(expr.object.type);
-    const object = this.interpreter.evaluateNext(expr.object);
+    const object = this.interpreter.evaluate(expr.object);
     let result = object[expr.property];
     return result;
   }
 
   ComputedMemberExpression(expr: ComputedMemberExpression) {
     if (expr.object.type === 'Super') return this.interpreter.skipOrThrow(expr.object.type);
-    const object = this.interpreter.evaluateNext(expr.object);
-    const property = this.interpreter.evaluateNext(expr.expression);
+    const object = this.interpreter.evaluate(expr.object);
+    const property = this.interpreter.evaluate(expr.expression);
     let result = object[property];
     if (isGetterInternal(object, property)) {
       result = result;
@@ -561,24 +553,24 @@ export class NodeHandler {
     const args: any[] = [];
     for (let arg of expr.arguments) {
       if (arg.type === 'SpreadElement') {
-        const value = this.interpreter.evaluateNext(arg.expression);
+        const value = this.interpreter.evaluate(arg.expression);
         args.push(...value);
       } else {
-        args.push(this.interpreter.evaluateNext(arg));
+        args.push(this.interpreter.evaluate(arg));
       }
     }
 
     let context = this.interpreter.getCurrentContext();
     let fn = null;
     if (expr.callee.type === 'StaticMemberExpression') {
-      context = this.interpreter.evaluateNext(expr.callee.object);
+      context = this.interpreter.evaluate(expr.callee.object);
       fn = context[expr.callee.property];
     } else if (expr.callee.type === 'ComputedMemberExpression') {
-      context = this.interpreter.evaluateNext(expr.callee.object);
-      const computedProperty = this.interpreter.evaluateNext(expr.callee.expression);
+      context = this.interpreter.evaluate(expr.callee.object);
+      const computedProperty = this.interpreter.evaluate(expr.callee.expression);
       fn = context[computedProperty];
     } else {
-      fn = this.interpreter.evaluateNext(expr.callee);
+      fn = this.interpreter.evaluate(expr.callee);
     }
 
     if (typeof fn === 'function') {
@@ -606,22 +598,22 @@ export class NodeHandler {
     switch (expr.binding.type) {
       case 'AssignmentTargetIdentifier':
         _debug(`assigning ${expr.binding.name} new value`);
-        return this.interpreter.updateVariableValue(expr.binding, this.interpreter.evaluateNext(expr.expression));
+        return this.interpreter.updateVariableValue(expr.binding, this.interpreter.evaluate(expr.expression));
       case 'ComputedMemberAssignmentTarget': {
-        const object = this.interpreter.evaluateNext(expr.binding.object);
-        const property = this.interpreter.evaluateNext(expr.binding.expression);
+        const object = this.interpreter.evaluate(expr.binding.object);
+        const property = this.interpreter.evaluate(expr.binding.expression);
         _debug(`evaluating expression ${expr.expression.type} to assign to ${toString(property)}`);
-        const value = this.interpreter.evaluateNext(expr.expression);
+        const value = this.interpreter.evaluate(expr.expression);
         _debug(`assigning object property "${toString(property)}" new value`);
         let result = (object[property] = value);
 
         return result;
       }
       case 'StaticMemberAssignmentTarget': {
-        const object = this.interpreter.evaluateNext(expr.binding.object);
+        const object = this.interpreter.evaluate(expr.binding.object);
         const property = expr.binding.property;
         _debug(`evaluating expression ${expr.expression.type} to assign to ${property}`);
-        const value = this.interpreter.evaluateNext(expr.expression);
+        const value = this.interpreter.evaluate(expr.expression);
         _debug(`assigning object property "${property}" new value`);
         const descriptor = Object.getOwnPropertyDescriptor(object, property);
 
@@ -645,15 +637,15 @@ export class NodeHandler {
         return expr.isPrefix ? nextValue : currentValue;
       }
       case 'ComputedMemberAssignmentTarget': {
-        const object = this.interpreter.evaluateNext(expr.operand.object);
-        const property = this.interpreter.evaluateNext(expr.operand.expression);
+        const object = this.interpreter.evaluate(expr.operand.object);
+        const property = this.interpreter.evaluate(expr.operand.expression);
         const currentValue = object[property];
         const nextValue = expr.operator === '++' ? currentValue + 1 : currentValue - 1;
         object[property] = nextValue;
         return expr.isPrefix ? nextValue : currentValue;
       }
       case 'StaticMemberAssignmentTarget': {
-        const object = this.interpreter.evaluateNext(expr.operand.object);
+        const object = this.interpreter.evaluate(expr.operand.object);
         const property = expr.operand.property;
         const currentValue = object[property];
         const nextValue = expr.operator === '++' ? currentValue + 1 : currentValue - 1;
@@ -670,22 +662,22 @@ export class NodeHandler {
     switch (expr.binding.type) {
       case 'AssignmentTargetIdentifier': {
         const currentValue = this.interpreter.getRuntimeValue(expr.binding);
-        const newValue = this.interpreter.evaluateNext(expr.expression);
+        const newValue = this.interpreter.evaluate(expr.expression);
         return this.interpreter.updateVariableValue(expr.binding, operation(currentValue, newValue));
       }
       case 'ComputedMemberAssignmentTarget': {
-        const object = this.interpreter.evaluateNext(expr.binding.object);
-        const property = this.interpreter.evaluateNext(expr.binding.expression);
+        const object = this.interpreter.evaluate(expr.binding.object);
+        const property = this.interpreter.evaluate(expr.binding.expression);
         const currentValue = object[property];
-        const newValue = this.interpreter.evaluateNext(expr.expression);
+        const newValue = this.interpreter.evaluate(expr.expression);
         const result = (object[property] = operation(currentValue, newValue));
         return result;
       }
       case 'StaticMemberAssignmentTarget': {
-        const object = this.interpreter.evaluateNext(expr.binding.object);
+        const object = this.interpreter.evaluate(expr.binding.object);
         const property = expr.binding.property;
         const currentValue = object[property];
-        const newValue = this.interpreter.evaluateNext(expr.expression);
+        const newValue = this.interpreter.evaluate(expr.expression);
         const result = (object[property] = operation(currentValue, newValue));
         return result;
       }
@@ -712,7 +704,7 @@ export class NodeHandler {
       if (el.type === 'TemplateElement') {
         parts.push(el.rawValue);
       } else {
-        parts.push(this.interpreter.evaluateNext(el));
+        parts.push(this.interpreter.evaluate(el));
       }
     }
     return parts.join('');
@@ -731,10 +723,10 @@ export class NodeHandler {
         }
         let returnValue = undefined;
         if (expr.body.type === 'FunctionBody') {
-          const blockResult = interpreter.evaluateNext(expr.body);
+          const blockResult = interpreter.evaluate(expr.body);
           returnValue = blockResult;
         } else {
-          returnValue = interpreter.evaluateNext(expr.body);
+          returnValue = interpreter.evaluate(expr.body);
         }
         interpreter.popContext();
         return returnValue;
@@ -766,9 +758,9 @@ export class NodeHandler {
   }
   BinaryExpression(expr: BinaryExpression) {
     const operation = binaryOperatorMap.get(expr.operator);
-    const left = this.interpreter.evaluateNext(expr.left);
+    const left = this.interpreter.evaluate(expr.left);
     const deferredRight = () => {
-      return this.interpreter.evaluateNext(expr.right);
+      return this.interpreter.evaluate(expr.right);
     };
     return operation(left, deferredRight);
   }
@@ -776,7 +768,7 @@ export class NodeHandler {
     const operation = unaryOperatorMap.get(expr.operator);
     if (!operation) return this.interpreter.skipOrThrow(`${expr.type} : ${expr.operator}`);
     try {
-      const operand = this.interpreter.evaluateNext(expr.operand);
+      const operand = this.interpreter.evaluate(expr.operand);
       return operation(operand);
     } catch (e) {
       if (e instanceof ReferenceError && expr.operator === 'typeof' && expr.operand.type === 'IdentifierExpression') {

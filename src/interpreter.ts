@@ -197,7 +197,7 @@ export class Interpreter extends EventEmitter {
       // it without the user knowing what they are doing.
       if (passedNode)
         throw new InterpreterRuntimeError(
-          `Can not evaluate ${passedNode.type} node without loading a program (Script node) first. If you know what you are doing, use .evaluateStatement() or .evaluateExpression() directly.`,
+          `Can not evaluate ${passedNode.type} node without loading a program (Script node) first.`,
         );
       else throw new InterpreterRuntimeError('No program to evaluate');
     }
@@ -211,7 +211,7 @@ export class Interpreter extends EventEmitter {
     const whenBroken = this.onBreak();
     let programResult: any = null;
     try {
-      programResult = this.evaluateNext(nodeToEvaluate);
+      programResult = this.evaluate(nodeToEvaluate);
       this.emit(InterpreterEventName.COMPLETE, new InterpreterCompleteEvent(programResult));
       debug(`completed execution with result: %o`, programResult);
       return programResult;
@@ -220,10 +220,10 @@ export class Interpreter extends EventEmitter {
       throw e;
     }
   }
-  private handleError(e: Error) {
-    debug(`Error during execution`);
-    const statementSrc = codegen.printSummary(this.lastStatement);
-    const nodeSrc = codegen.printSummary(this.lastInstruction.node);
+  private handleError(e: any) {
+    debug.extend('error')(`Error during execution`);
+    const statementSrc = codegen.printSummary(e.lastStatement);
+    const nodeSrc = codegen.printSummary(e.lastInstruction.node);
     console.log(statementSrc.replace(nodeSrc, `👉👉👉${chalk.red(nodeSrc)}`));
   }
   onComplete() {
@@ -318,30 +318,20 @@ export class Interpreter extends EventEmitter {
   }
   evaluateInstruction(instruction: Instruction) {
     this.lastInstruction = instruction;
-    let result;
-    if (isBlockType(instruction.node)) {
-      result = this.evaluateBlock(instruction.node);
-    } else if (isStatement(instruction.node)) {
-      result = this.evaluateStatement(instruction.node);
-    } else if (instruction.node.type === 'VariableDeclarator') {
-      result = this.handler.VariableDeclarator(instruction.node);
-    } else {
-      result = this.evaluateExpression(instruction.node);
-    }
-    instruction.result = result;
-    return result;
+    const node = instruction.node;
+    if (isStatement(node)) this.lastStatement = node;
+    let result = this.handler[node.type](node);
+    return (instruction.result = result);
   }
-  evaluateNext(node: InstructionNode | null): any {
+  evaluate(node: InstructionNode | null): any {
     if (node === null) {
       return undefined;
     } else {
+      // yeah this looks weird, it's a remnant of when this was all async. You used
+      // to be able to stop and start the program but the implementation with native JS promises
+      // caused problems. Now there are warts, like this, that need to be refactored away.
       const nextInstruction = this.pointer.add(node);
       this.nextInstruction = nextInstruction;
-      const triggeredBreaks = this.breakpoints.filter((bp: Breakpoint) => bp.test(this));
-      if (triggeredBreaks.length > 0) {
-        debug('breakpoint hit');
-        this.pause();
-      }
       const instruction = this.pointer.nextInstruction();
       if (!instruction) {
         debug(`no instruction to evaluate, returning`);
@@ -351,35 +341,18 @@ export class Interpreter extends EventEmitter {
       try {
         return this.evaluateInstruction(instruction);
       } catch (e) {
-        this.handleError(e);
+        console.log('enext');
+        if (!e.lastStatement) e.lastStatement = this.lastStatement;
+        if (!e.lastInstruction) e.lastInstruction = this.lastInstruction;
         throw e;
       }
     }
-  }
-  evaluateBlock(block: BlockType): any {
-    if (block === null) return;
-    switch (block.type) {
-      case 'Block':
-        return this.handler.Block(block);
-      case 'FunctionBody':
-        return this.handler.FunctionBody(block);
-      case 'Script':
-        return this.handler.Script(block);
-    }
-  }
-  evaluateExpression(expr: Expression | Super | null): any {
-    if (expr === null) return;
-    return this.handler[expr.type](expr);
-  }
-  evaluateStatement(stmt: Statement): any {
-    this.lastStatement = stmt;
-    return this.handler[stmt.type](stmt);
   }
   hoistFunctions(block: BlockType) {
     const functions = block.statements.filter(s => s.type === 'FunctionDeclaration');
     if (functions.length) debug(`hoisting %o functions in %o`, functions.length, block.type);
     for (let fnDecl of functions) {
-      this.evaluateNext(fnDecl);
+      this.evaluate(fnDecl);
     }
   }
 
@@ -397,7 +370,7 @@ export class Interpreter extends EventEmitter {
 
   declareVariables(decl: VariableDeclaration) {
     for (let declarator of decl.declarators) {
-      this.evaluateNext(declarator);
+      this.evaluate(declarator);
     }
   }
 
@@ -410,7 +383,7 @@ export class Interpreter extends EventEmitter {
           name = node.name.name;
           break;
         case 'ComputedPropertyName':
-          name = this.evaluateNext(node.name.expression);
+          name = this.evaluate(node.name.expression);
           break;
         case 'StaticPropertyName':
           name = node.name.value;
@@ -453,7 +426,7 @@ export class Interpreter extends EventEmitter {
           );
         }
         fnDebug('evaluating function body');
-        const result = interpreter.evaluateNext(node.body);
+        const result = interpreter.evaluate(node.body);
         fnDebug('completed evaluating function body');
 
         interpreter.popContext();
@@ -506,13 +479,13 @@ export class Interpreter extends EventEmitter {
             if (prop.type === 'BindingPropertyIdentifier') {
               const name = prop.binding.name;
               if (init[name] === undefined && prop.init) {
-                this.bindVariable(prop.binding, this.evaluateNext(prop.init));
+                this.bindVariable(prop.binding, this.evaluate(prop.init));
               } else {
                 this.bindVariable(prop.binding, init[name]);
               }
             } else {
               const name =
-                prop.name.type === 'ComputedPropertyName' ? this.evaluateNext(prop.name.expression) : prop.name.value;
+                prop.name.type === 'ComputedPropertyName' ? this.evaluate(prop.name.expression) : prop.name.value;
               this.bindVariable(prop.binding, init[name]);
             }
           }
@@ -522,7 +495,7 @@ export class Interpreter extends EventEmitter {
       case 'BindingWithDefault':
         if (init === undefined) {
           _debug(`evaluating default for undefined argument`);
-          const defaults = this.evaluateNext(binding.init);
+          const defaults = this.evaluate(binding.init);
           _debug(`binding default`);
           this.bindVariable(binding.binding, defaults);
         } else {
@@ -563,8 +536,9 @@ export class Interpreter extends EventEmitter {
     } else {
       const contexts = this.getContexts();
       for (let i = contexts.length - 1; i > -1; i--) {
-        if (variable.name in this.contexts[i]) {
-          const value = contexts[i][variable.name];
+        const context = contexts[i];
+        if (variable.name in context) {
+          const value = context[variable.name];
           return value;
         }
       }

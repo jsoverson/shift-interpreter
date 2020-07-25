@@ -67,8 +67,8 @@ describe('ExoticScenarios', () => {
     const interpreter = new Interpreter();
     interpreter.load(tree);
     // @ts-ignore
-    interpreter.evaluateStatement(tree.statements[0].expression.callee.body.statements[0]);
-    interpreter.evaluateStatement(
+    interpreter.evaluate(tree.statements[0].expression.callee.body.statements[0]);
+    interpreter.evaluate(
       // @ts-ignore
       tree.statements[0].expression.callee.body.statements[1].elements[1].method.body.statements[0],
     );

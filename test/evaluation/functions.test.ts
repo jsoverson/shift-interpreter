@@ -153,7 +153,7 @@ describe('Getters/Setters', () => {
     const objectExpression = tree.statements[0].expression as AssignmentExpression;
     const interpreter = new Interpreter();
     interpreter.load(tree);
-    const obj = interpreter.evaluateNext(objectExpression);
+    const obj = interpreter.evaluate(objectExpression);
     obj.property = 22;
     chai.expect(obj._secretProp).to.equal(22);
   });

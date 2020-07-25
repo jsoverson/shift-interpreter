@@ -60,7 +60,7 @@ export function compare(src: string | Function, context?: BasicContext): Result 
   let nativeExpectedValue, nativeExpectedError;
   debug(`compare(\`${src}\`)`);
   try {
-    nativeExpectedValue = evaluate(src);
+    nativeExpectedValue = evaluate(src, context);
   } catch (e) {
     nativeExpectedError = e;
   }

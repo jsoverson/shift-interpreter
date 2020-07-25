@@ -8,8 +8,8 @@ export function interpretSource(source: string, context = {}) {
 
 export function interpretTree(tree: Script, context = {}) {
   const interpreter = new Interpreter();
-  interpreter.load(tree);
   interpreter.pushContext(context);
+  interpreter.load(tree);
   return interpreter.run();
 }
 

@@ -17,6 +17,7 @@ export interface Result {
   expectedError: Error;
   src: string;
   success: boolean;
+  interpreter: Interpreter;
 }
 
 export function assertResult(result: Result) {
@@ -68,9 +69,7 @@ export function compare(src: string | Function, context?: BasicContext): Result 
   let finalSrc = typeof src === 'string' ? src : funcify(src);
   try {
     interpreter.load(parseScript(finalSrc));
-    // const result = interpreter.stepInteractive();
-    const result = interpreter.run();
-    interpreterActualValue = result;
+    interpreterActualValue = interpreter.run();
   } catch (e) {
     interpreterActualError = e;
   }
@@ -110,5 +109,6 @@ export function compare(src: string | Function, context?: BasicContext): Result 
     expectedError: nativeExpectedError,
     src: finalSrc,
     success,
+    interpreter,
   };
 }

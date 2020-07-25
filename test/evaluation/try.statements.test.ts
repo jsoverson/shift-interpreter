@@ -1,4 +1,5 @@
 import {compare, assertResult} from '../util';
+import assert from 'assert';
 
 describe('Try/Catch', () => {
   it('should catch errors', () => {
@@ -23,6 +24,19 @@ describe('Try/Catch', () => {
     `,
       ),
     );
+  });
+  it('should be able to return errors from catch', () => {
+    const src = `
+(function() {
+  try {
+    null[0];
+  } catch (t) {
+    return t;
+  }
+})();`;
+    const result = compare(src);
+    assert.equal(result.interpreter.errorLocation, undefined);
+    assertResult(result);
   });
   it('should return from catch', () => {
     assertResult(

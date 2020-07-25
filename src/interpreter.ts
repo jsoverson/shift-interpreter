@@ -11,20 +11,18 @@ import {
   ObjectBinding,
   Script,
   Statement,
-  Super,
   VariableDeclaration,
   VariableDeclarationStatement,
 } from 'shift-ast';
 import * as codegen from 'shift-printer';
 import shiftScope, {Scope, ScopeLookup, Variable} from 'shift-scope';
-import {Breakpoint, NodeBreakpoint} from './breakpoint';
 import {BasicContext} from './context';
 import {InterpreterRuntimeError} from './errors';
 import {Instruction} from './instruction';
-import {InstructionBuffer, InstructionBufferEventName} from './instruction-buffer';
+import {InstructionBuffer} from './instruction-buffer';
 import {NodeHandler} from './node-handler';
 import {BlockType, FuncType, Identifier, InstructionNode} from './types';
-import {isBlockType, isStatement} from './util';
+import {isStatement} from './util';
 
 const debug = DEBUG('shift-interpreter');
 
@@ -35,8 +33,6 @@ interface Options {
 
 export enum InterpreterEventName {
   COMPLETE = 'complete',
-  CONTINUE = 'continue',
-  BREAK = 'break',
 }
 
 export abstract class InterpreterEvent {
@@ -50,21 +46,6 @@ export class InterpreterCompleteEvent extends InterpreterEvent {
     this.result = result;
   }
 }
-export class InterpreterContinueEvent extends InterpreterEvent {
-  instruction: Instruction;
-  constructor(instruction: Instruction) {
-    super();
-    this.instruction = instruction;
-  }
-}
-export class InterpreterBreakEvent extends InterpreterEvent {
-  instruction: Instruction;
-  constructor(instruction: Instruction) {
-    super();
-    this.instruction = instruction;
-  }
-}
-
 export class Interpreter extends EventEmitter {
   contexts: BasicContext[] = [];
   globalScope: Scope = shiftScope(new Script({directives: [], statements: []}));
@@ -77,14 +58,12 @@ export class Interpreter extends EventEmitter {
   handler: NodeHandler;
   contextProxies = new WeakMap<typeof Proxy, any>();
   pointer = new InstructionBuffer();
-  breakpoints: Breakpoint[] = [];
   lastStatement: Statement = new EmptyStatement();
   lastInstruction: Instruction = new Instruction(new EmptyStatement(), -1);
-  nextInstruction: Instruction = new Instruction(new EmptyStatement(), -1);
-  hasStarted: boolean = false;
   _isReturning: boolean = false;
   _isBreaking: boolean = false;
   _isContinuing: boolean = false;
+  errorLocation?: {lastInstruction: Instruction; lastStatement: Statement};
 
   constructor(options: Options = {}) {
     super();
@@ -94,12 +73,6 @@ export class Interpreter extends EventEmitter {
     } else {
       this.handler = new NodeHandler(this);
     }
-    this.pointer.on(InstructionBufferEventName.CONTINUE, (nextInstruction: Instruction) => {
-      this.emit(InterpreterEventName.CONTINUE, new InterpreterContinueEvent(nextInstruction));
-    });
-    this.pointer.on(InstructionBufferEventName.HALT, (nextInstruction: Instruction) => {
-      this.emit(InterpreterEventName.BREAK, new InterpreterBreakEvent(nextInstruction));
-    });
   }
 
   print(node?: Node) {
@@ -125,7 +98,6 @@ export class Interpreter extends EventEmitter {
     this.lookupTable = new ScopeLookup(this.globalScope);
     this.buildScopeMap();
     this.loadedScript = script;
-    this.hasStarted = false;
   }
 
   private buildScopeMap() {
@@ -179,6 +151,7 @@ export class Interpreter extends EventEmitter {
     if (state !== undefined) this._isContinuing = state;
     return this._isContinuing;
   }
+
   run(passedNode?: InstructionNode): Promise<any> {
     let nodeToEvaluate: InstructionNode | undefined = undefined;
 
@@ -207,8 +180,6 @@ export class Interpreter extends EventEmitter {
     }
 
     debug('starting execution');
-    this.hasStarted = true;
-    const whenBroken = this.onBreak();
     let programResult: any = null;
     try {
       programResult = this.evaluate(nodeToEvaluate);
@@ -216,105 +187,33 @@ export class Interpreter extends EventEmitter {
       debug(`completed execution with result: %o`, programResult);
       return programResult;
     } catch (e) {
+      this.errorLocation = {
+        lastStatement: this.lastStatement,
+        lastInstruction: this.lastInstruction,
+      };
       this.handleError(e);
       throw e;
     }
   }
   private handleError(e: any) {
     debug.extend('error')(`Error during execution`);
-    const statementSrc = codegen.printSummary(e.lastStatement);
-    const nodeSrc = codegen.printSummary(e.lastInstruction.node);
-    console.log(statementSrc.replace(nodeSrc, `👉👉👉${chalk.red(nodeSrc)}`));
+    if (this.errorLocation) {
+      const statementSrc = codegen.printSummary(this.errorLocation.lastStatement);
+      const nodeSrc = codegen.printSummary(this.errorLocation.lastInstruction.node);
+      console.log(statementSrc.replace(nodeSrc, `👉👉👉${chalk.red(nodeSrc)}`));
+    } else {
+      console.log('No error location recorded.');
+    }
   }
   onComplete() {
     return new Promise<InterpreterCompleteEvent>((res, rej) => {
       this.once(InterpreterEvent.type.COMPLETE, res);
     });
   }
-  onContinue() {
-    return new Promise<InterpreterContinueEvent>((res, rej) => {
-      this.once(InterpreterEvent.type.CONTINUE, res);
-    });
-  }
-  onBreak() {
-    return new Promise<InterpreterBreakEvent>((res, rej) => {
-      this.once(InterpreterEvent.type.BREAK, res);
-    });
-  }
-  onHalt() {
-    return Promise.race([this.onBreak(), this.onComplete()]);
-  }
   runToFirstError(passedNode?: Script | Statement | Expression) {
-    return this.run(passedNode).catch(e => {
-      console.log(`Error in run, skipping. ${e.message}`);
-      return undefined;
-    });
-  }
-  //   async step() {
-  //     this.pointer.pause();
-  //     debug('stepping');
-  //     if (!this.hasStarted) {
-  //       this.run();
-  //     }
-  //     this.pointer.step();
-  //     return this.onHalt();
-  //   }
-  //   async stepInteractive() {
-  //     const readline = createReadlineInterface();
-  //     outerloop: while (true) {
-  //       const answer = await readline('> ');
-  //       switch (answer) {
-  //         case 'next':
-  //         case 'step':
-  //         case 'n':
-  //         case 's':
-  //         case '':
-  //           const nextInstruction = this.pointer.buffer[0];
-  //           const lastInstruction = this.lastInstruction;
-  //           if (lastInstruction) {
-  //             const result = lastInstruction.result;
-  //             if (isIntermediaryFunction(result)) {
-  //               console.log(`Result: interpreter intermediary function ${result.name}`);
-  //             } else {
-  //               console.log(`Result:`);
-  //               console.log(inspect(result));
-  //             }
-  //           }
-  //           if (nextInstruction) {
-  //             console.log(`next: ${codegen.printSummary(nextInstruction.node)}`);
-  //           } else if (this.loadedScript) {
-  //             console.log(`next: Script (${this.loadedScript.statements.length} statements)`);
-  //           }
-  //           await this.step();
-  //           break;
-  //         case 'exit':
-  //         case 'quit':
-  //         case 'q':
-  //           break outerloop;
-  //         default:
-  //           console.log(`
-  // command ${answer} not understood.
-  // next, step, n, s, <enter>: step
-  // exit, quit, q: quit
-  // `);
-  //       }
-  //     }
-  //     console.log('exiting');
-  //   }
-  pause() {
-    debug('pausing');
-    // this.pointer.pause();
-  }
-  unpause() {
-    debug('unpausing');
-    // this.pointer.unpause();
-  }
-  continue() {
-    this.unpause();
-    return this.onHalt();
-  }
-  breakAtNode(node: Node) {
-    this.breakpoints.push(new NodeBreakpoint(node));
+    try {
+      return this.run(passedNode);
+    } catch (e) {}
   }
   evaluateInstruction(instruction: Instruction) {
     this.lastInstruction = instruction;
@@ -328,24 +227,16 @@ export class Interpreter extends EventEmitter {
       return undefined;
     } else {
       // yeah this looks weird, it's a remnant of when this was all async. You used
-      // to be able to stop and start the program but the implementation with native JS promises
-      // caused problems. Now there are warts, like this, that need to be refactored away.
-      const nextInstruction = this.pointer.add(node);
-      this.nextInstruction = nextInstruction;
+      // to be able to stop, start, and break the program but the implementation with native JS promises
+      // caused problems. I'm keeping the instruction buffer because hey, maybe it'll come back.
+      this.pointer.add(node);
       const instruction = this.pointer.nextInstruction();
       if (!instruction) {
         debug(`no instruction to evaluate, returning`);
         return;
       }
       debug(`evaluating instruction from %o -> %o`, this.lastInstruction.node.type, node.type);
-      try {
-        return this.evaluateInstruction(instruction);
-      } catch (e) {
-        console.log('enext');
-        if (!e.lastStatement) e.lastStatement = this.lastStatement;
-        if (!e.lastInstruction) e.lastInstruction = this.lastInstruction;
-        throw e;
-      }
+      return this.evaluateInstruction(instruction);
     }
   }
   hoistFunctions(block: BlockType) {

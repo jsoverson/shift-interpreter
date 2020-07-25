@@ -200,9 +200,12 @@ export class NodeHandler {
     try {
       returnValue = this.interpreter.evaluate(stmt.body);
     } catch (e) {
-      console.log(e);
       this.interpreter.bindVariable(stmt.catchClause.binding, e);
-      returnValue = this.interpreter.evaluate(stmt.catchClause.body);
+      try {
+        returnValue = this.interpreter.evaluate(stmt.catchClause.body);
+      } catch (e) {
+        throw e;
+      }
     }
     return returnValue;
   }
@@ -214,7 +217,11 @@ export class NodeHandler {
         returnValue = this.interpreter.evaluate(stmt.body);
       } catch (e) {
         this.interpreter.bindVariable(stmt.catchClause.binding, e);
-        returnValue = this.interpreter.evaluate(stmt.catchClause.body);
+        try {
+          returnValue = this.interpreter.evaluate(stmt.catchClause.body);
+        } catch (e) {
+          throw e;
+        }
       } finally {
         returnValue = this.interpreter.evaluate(stmt.finalizer);
       }

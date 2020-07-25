@@ -1,8 +1,10 @@
+import DEBUG from 'debug';
 import {
   ArrayExpression,
   ArrowExpression,
   AssignmentExpression,
   BinaryExpression,
+  Block,
   BlockStatement,
   CallExpression,
   ClassDeclaration,
@@ -14,6 +16,7 @@ import {
   ForInStatement,
   ForOfStatement,
   ForStatement,
+  FunctionBody,
   FunctionDeclaration,
   FunctionExpression,
   IdentifierExpression,
@@ -27,6 +30,7 @@ import {
   NewExpression,
   ObjectExpression,
   ReturnStatement,
+  Script,
   StaticMemberExpression,
   TemplateExpression,
   ThisExpression,
@@ -38,19 +42,12 @@ import {
   VariableDeclarationStatement,
   VariableDeclarator,
   WhileStatement,
-  Block,
-  FunctionBody,
-  Script,
 } from 'shift-ast';
+import {BasicContext} from './context';
 import {InterpreterRuntimeError} from './errors';
 import {Interpreter} from './interpreter';
 import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
-import DEBUG from 'debug';
-import {isIntermediaryFunction, isGetterInternal, toString} from './util';
-import * as codegen from 'shift-printer';
-import {BasicContext} from './context';
-import {BlockType} from './types';
-import {interpret} from '.';
+import {toString} from './util';
 
 export interface DynamicClass {
   [key: string]: any;
@@ -453,9 +450,7 @@ export class NodeHandler {
       }
     }
     let result = new newTarget(...args);
-    if (isIntermediaryFunction(newTarget)) {
-      result = result;
-    }
+
     return result;
   }
 
@@ -547,9 +542,6 @@ export class NodeHandler {
     const object = this.interpreter.evaluate(expr.object);
     const property = this.interpreter.evaluate(expr.expression);
     let result = object[property];
-    if (isGetterInternal(object, property)) {
-      result = result;
-    }
     return result;
   }
 
@@ -582,18 +574,9 @@ export class NodeHandler {
 
     if (typeof fn === 'function') {
       let returnValue: any;
-      let modifiedCall =
-        (fn === Function.prototype.call || fn === Function.prototype.apply) && isIntermediaryFunction(context);
-      if (fn._interp || modifiedCall) {
-        // we have an interpreter-made function so the promise is ours.
-        _debug(`calling interpreter function ${fn.name}`);
-        returnValue = fn.apply(context, args);
-        _debug(`interpreter function completed ${fn.name}`);
-      } else {
-        _debug(`calling host function ${fn.name}`);
-        returnValue = fn.apply(context, args);
-        _debug(`host function completed ${fn.name}`);
-      }
+      _debug(`calling function ${fn.name}`);
+      returnValue = fn.apply(context, args);
+      _debug(`function completed ${fn.name}`);
       return returnValue;
     } else {
       new TypeError(`${fn} is not a function (${this.interpreter.codegen(expr)})`);
@@ -738,7 +721,7 @@ export class NodeHandler {
         interpreter.popContext();
         return returnValue;
       };
-      Object.assign(arrowFn, {_interp: true});
+      Object.assign(arrowFn);
       return arrowFn;
     }.bind(currentContext)();
   }

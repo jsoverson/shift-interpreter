@@ -1,25 +1,25 @@
 import {
-  BindingIdentifier,
-  IdentifierExpression,
   AssignmentTargetIdentifier,
-  ForStatement,
-  WhileStatement,
-  ForOfStatement,
-  ForInStatement,
-  DoWhileStatement,
+  BindingIdentifier,
   Block,
+  DoWhileStatement,
+  Expression,
+  ForInStatement,
+  ForOfStatement,
+  ForStatement,
   FunctionBody,
   FunctionDeclaration,
   FunctionExpression,
-  Method,
   Getter,
+  IdentifierExpression,
+  Method,
+  Script,
   Setter,
   Statement,
-  Expression,
   Super,
   VariableDeclarator,
+  WhileStatement,
 } from 'shift-ast';
-import {Script} from 'shift-ast';
 
 export type Identifier = BindingIdentifier | IdentifierExpression | AssignmentTargetIdentifier;
 

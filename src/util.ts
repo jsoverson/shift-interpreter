@@ -17,17 +17,6 @@ export function isBlockType(node: Node): node is BlockType {
   }
 }
 
-export function isIntermediaryFunction(fn: any): boolean {
-  //@ts-ignore
-  return typeof fn === 'function' && !!fn._interp;
-}
-
-export function isGetterInternal(obj: any, prop: string) {
-  const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
-  if (!descriptor) return false;
-  return descriptor.get && isIntermediaryFunction(descriptor.get);
-}
-
 export function createReadlineInterface() {
   const readline = nodeReadline.createInterface({
     input: process.stdin,

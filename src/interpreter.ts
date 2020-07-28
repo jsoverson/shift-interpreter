@@ -137,6 +137,12 @@ export class Interpreter extends EventEmitter {
     return this.contexts;
   }
 
+  getContext(index: number) {
+    const context = this.contexts[index];
+    if (context === undefined) return this.contexts[0];
+    return context;
+  }
+
   isReturning(state?: boolean) {
     if (state !== undefined) this._isReturning = state;
     return this._isReturning;
@@ -427,7 +433,10 @@ export class Interpreter extends EventEmitter {
     } else {
       const contexts = this.getContexts();
       for (let i = contexts.length - 1; i > -1; i--) {
-        const context = contexts[i];
+        const context = this.getContext(i);
+        if (!context) {
+          throw new Error('No context to evaluate in.');
+        }
         if (variable.name in context) {
           const value = context[variable.name];
           return value;

@@ -1,6 +1,6 @@
-import {Node, Statement} from 'shift-ast';
-import {BlockType} from './types';
-import {default as nodeReadline} from 'readline';
+import { Node, Statement } from 'shift-ast';
+import { BlockType } from './types';
+import { default as nodeReadline } from 'readline';
 
 export function isStatement(node: Node): node is Statement {
   return node.type.match(/Statement/) || node.type.match('Declaration') ? true : false;

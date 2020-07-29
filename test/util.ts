@@ -1,7 +1,7 @@
-import {expect} from 'chai';
-import {parseScript} from 'shift-parser';
-import {Interpreter} from '../src/interpreter';
-import {BasicContext} from '../src/context';
+import { expect } from 'chai';
+import { parseScript } from 'shift-parser';
+import { Interpreter } from '../src/interpreter';
+import { BasicContext } from '../src/context';
 import deepEqual from 'deep-equal';
 
 import DEBUG from 'debug';
@@ -57,7 +57,6 @@ function funcify(fn: Function) {
 
 export function compare(src: string | Function, context?: BasicContext): Result {
   const interpreter = new Interpreter();
-  if (context) interpreter.pushContext(context);
   let nativeExpectedValue, nativeExpectedError;
   debug(`compare(\`${src}\`)`);
   try {
@@ -68,7 +67,7 @@ export function compare(src: string | Function, context?: BasicContext): Result 
   let interpreterActualValue, interpreterActualError;
   let finalSrc = typeof src === 'string' ? src : funcify(src);
   try {
-    interpreter.load(parseScript(finalSrc));
+    interpreter.load(parseScript(finalSrc), context);
     interpreterActualValue = interpreter.run();
   } catch (e) {
     interpreterActualError = e;
@@ -86,7 +85,7 @@ export function compare(src: string | Function, context?: BasicContext): Result 
   } else if (nativeExpectedError) {
     if (!interpreterActualError) {
       debug(`Failure: Native produced error, Interpreter did not`);
-      interpreterActualError = {message: '<<Did not throw an error>>'};
+      interpreterActualError = { message: '<<Did not throw an error>>' };
       success = false;
     } else {
       success = interpreterActualError.message === nativeExpectedError.message;

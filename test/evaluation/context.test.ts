@@ -1,5 +1,5 @@
-import {assertResult, compare} from '../util';
-import chai, {expect} from 'chai';
+import { assertResult, compare } from '../util';
+import chai, { expect } from 'chai';
 import spies from 'chai-spies';
 
 chai.use(spies);
@@ -18,7 +18,7 @@ describe('External context', () => {
         `
       console.log("Hello world");
     `,
-        {console},
+        { console },
       ),
     );
 

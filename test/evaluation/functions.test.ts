@@ -1,8 +1,8 @@
 import chai from 'chai';
-import {assertResult, compare} from '../util';
-import {parseScript} from 'shift-parser';
-import {Interpreter, interpret} from '../../src';
-import {FunctionDeclaration, AssignmentExpression} from 'shift-ast';
+import { AssignmentExpression, FunctionDeclaration, Statement } from 'shift-ast';
+import { parseScript } from 'shift-parser';
+import { Interpreter } from '../../src';
+import { assertResult, compare } from '../util';
 
 describe('Functions', () => {
   it('should declare functions', () => {
@@ -11,7 +11,14 @@ describe('Functions', () => {
   it('should hoist functions for purposes of member access/assignment', () => {
     assertResult(compare("a.foo = 'bar'; function a(){}; a.foo;"));
   });
-
+  it('should use global context if called with undefined context', () => {
+    assertResult(compare(`'();'.replace('()', function(){})`));
+  });
+  it('declarations in block scope should be defined across all scope Variable references', () => {
+    // shift-scope defines multiple variables for block scopes, references should be the same all around.
+    assertResult(compare(`let a = '';{function fn() {return 'decl'}a+=fn()}a+=fn();a;`));
+    assertResult(compare(`let inner;{function fn() {}inner=fn}let outer = fn; outer === inner`));
+  });
   it('should call methods on primitive literals', () => {
     assertResult(compare("'a'.replace('a','b');"));
   });
@@ -106,7 +113,7 @@ describe('Functions', () => {
     const interpreter = new Interpreter();
     interpreter.load(ast);
     interpreter.run();
-    const fnDecl = ast.statements.find(st => st.type === 'FunctionDeclaration') as FunctionDeclaration;
+    const fnDecl = ast.statements.find((st: Statement) => st.type === 'FunctionDeclaration') as FunctionDeclaration;
 
     const fn = () => {
       const value = interpreter.getRuntimeValue(fnDecl.name);

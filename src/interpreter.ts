@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import DEBUG from 'debug';
-import {EventEmitter} from 'events';
+import { EventEmitter } from 'events';
 import {
   ArrayBinding,
   BindingIdentifier,
@@ -15,20 +15,19 @@ import {
   VariableDeclarationStatement,
 } from 'shift-ast';
 import * as codegen from 'shift-printer';
-import shiftScope, {Scope, ScopeLookup, Variable} from 'shift-scope';
-import {BasicContext} from './context';
-import {InterpreterRuntimeError} from './errors';
-import {Instruction} from './instruction';
-import {InstructionBuffer} from './instruction-buffer';
-import {NodeHandler} from './node-handler';
-import {BlockType, FuncType, Identifier, InstructionNode} from './types';
-import {isStatement} from './util';
+import shiftScope, { Scope, ScopeLookup, Variable } from 'shift-scope';
+import { BasicContext } from './context';
+import { InterpreterRuntimeError } from './errors';
+import { InstructionBuffer, Instruction } from './instruction-buffer';
+import { NodeHandler } from './node-handler';
+import { BlockType, FuncType, Identifier, InstructionNode } from './types';
+import { isStatement } from './util';
 
 const debug = DEBUG('shift-interpreter');
 
 interface Options {
   skipUnsupported?: boolean;
-  handler?: {new (interpreter: Interpreter): NodeHandler};
+  handler?: { new (interpreter: Interpreter): NodeHandler };
 }
 
 export enum InterpreterEventName {
@@ -46,15 +45,15 @@ export class InterpreterCompleteEvent extends InterpreterEvent {
     this.result = result;
   }
 }
-export class Interpreter extends EventEmitter {
+export class Interpreter {
   contexts: BasicContext[] = [];
-  globalScope: Scope = shiftScope(new Script({directives: [], statements: []}));
+  globalScope: Scope = shiftScope(new Script({ directives: [], statements: [] }));
   lookupTable: ScopeLookup = new ScopeLookup(this.globalScope);
   scopeMap: WeakMap<Variable, Scope> = new WeakMap();
   scopeOwnerMap: WeakMap<Node, Scope> = new WeakMap();
   variableMap = new Map<Variable, any>();
   options: Options;
-  loadedScript: Script = new Script({directives: [], statements: []});
+  loadedScript: Script = new Script({ directives: [], statements: [] });
   handler: NodeHandler;
   contextProxies = new WeakMap<typeof Proxy, any>();
   pointer = new InstructionBuffer();
@@ -63,10 +62,9 @@ export class Interpreter extends EventEmitter {
   _isReturning: boolean = false;
   _isBreaking: boolean = false;
   _isContinuing: boolean = false;
-  errorLocation?: {lastInstruction: Instruction; lastStatement: Statement};
+  errorLocation?: { lastInstruction: Instruction; lastStatement: Statement };
 
   constructor(options: Options = {}) {
-    super();
     this.options = options;
     if (this.options.handler) {
       this.handler = new this.options.handler(this);
@@ -92,22 +90,21 @@ export class Interpreter extends EventEmitter {
     throw new InterpreterRuntimeError(`Unsupported node ${type}`);
   }
 
-  load(script: Script) {
+  load(script: Script, context: BasicContext = {}) {
     debug('loading script');
     this.globalScope = shiftScope(script);
     this.lookupTable = new ScopeLookup(this.globalScope);
     this.buildScopeMap();
     this.loadedScript = script;
+    this.pushContext(context);
   }
 
   private buildScopeMap() {
     const lookupTable = this.lookupTable;
     this.scopeMap = new WeakMap();
-    // this.variables = new Set();
     const recurse = (scope: Scope) => {
       this.scopeOwnerMap.set(scope.astNode, scope);
       scope.variableList.forEach((variable: Variable) => {
-        // this.variables.add(variable);
         this.scopeMap.set(variable, scope);
       });
       scope.children.forEach(recurse);
@@ -189,7 +186,6 @@ export class Interpreter extends EventEmitter {
     let programResult: any = null;
     try {
       programResult = this.evaluate(nodeToEvaluate);
-      this.emit(InterpreterEventName.COMPLETE, new InterpreterCompleteEvent(programResult));
       debug(`completed execution with result: %o`, programResult);
       return programResult;
     } catch (e) {
@@ -211,11 +207,7 @@ export class Interpreter extends EventEmitter {
       console.log('No error location recorded.');
     }
   }
-  onComplete() {
-    return new Promise<InterpreterCompleteEvent>((res, rej) => {
-      this.once(InterpreterEvent.type.COMPLETE, res);
-    });
-  }
+
   runToFirstError(passedNode?: Script | Statement | Expression) {
     try {
       return this.run(passedNode);
@@ -343,7 +335,7 @@ export class Interpreter extends EventEmitter {
       },
     }[name];
 
-    return Object.assign(fn, {_interp: true});
+    return Object.assign(fn, { _interp: true });
   }
 
   bindVariable(binding: BindingIdentifier | ArrayBinding | ObjectBinding | BindingWithDefault, init: any) {
@@ -406,6 +398,8 @@ export class Interpreter extends EventEmitter {
 
     if (variables.length > 1) throw new Error('reproduce this and handle it better');
     const variable = variables[0];
+    const decl = variable.declarations[0];
+    if (decl && decl.type.name === 'Const') throw new TypeError('Assignment to constant variable.');
     this.setRuntimeValue(variable, value);
     return value;
   }

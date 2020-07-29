@@ -1,4 +1,4 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('Classes', () => {
   it('should declare a class', () => {

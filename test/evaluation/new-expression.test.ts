@@ -1,5 +1,5 @@
-import {describe} from 'mocha';
-import {assertResult, compare} from '../util';
+import { describe } from 'mocha';
+import { assertResult, compare } from '../util';
 
 describe('new', () => {
   it('should instantiate functions and retain prototype chain', () => {

@@ -1,7 +1,7 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('Errors', () => {
   it('should throw', () => {
-    assertResult(compare("throw new Error('hello world')", {Error}));
+    assertResult(compare("throw new Error('hello world')", { Error }));
   });
 });

@@ -1,12 +1,12 @@
-import {compare, assertResult} from '../util';
+import { compare, assertResult } from '../util';
 import assert from 'assert';
 
 describe('Try/Catch', () => {
   it('should catch errors', () => {
-    assertResult(compare(`let msg = ''; try{ throw new Error('err') } catch(e) {msg = e.message} msg`, {Error}));
+    assertResult(compare(`let msg = ''; try{ throw new Error('err') } catch(e) {msg = e.message} msg`, { Error }));
   });
   it('should allow rethrowing', () => {
-    assertResult(compare(`try{ throw new Error('err') } catch(e) {throw e}`, {Error}));
+    assertResult(compare(`try{ throw new Error('err') } catch(e) {throw e}`, { Error }));
   });
   it('should return from try', () => {
     assertResult(
@@ -57,7 +57,7 @@ describe('Try/Catch', () => {
 
     assertThrows(Error, () => { throw new Error() })
     `,
-        {Error, console},
+        { Error, console },
       ),
     );
   });

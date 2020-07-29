@@ -1,13 +1,9 @@
-import {parseScript} from 'shift-parser';
-import {Interpreter} from '../../src/interpreter';
-import {ExpressionStatement} from 'shift-ast';
 import chai from 'chai';
-import {assertResult, compare} from '../util';
+import { parseScript } from 'shift-parser';
+import { Interpreter } from '../../src/interpreter';
+import { assertResult, compare } from '../util';
 
 describe('ExoticScenarios', () => {
-  it('what', () => {
-    assertResult(compare(`'();'.replace('()', function(){})`));
-  });
   it('should allow piecemeal execution', () => {
     const source = `
     (function() {

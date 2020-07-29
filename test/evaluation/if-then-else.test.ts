@@ -1,4 +1,4 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('If Then Else', () => {
   it('should evaluate if statements', () => {

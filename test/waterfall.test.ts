@@ -1,9 +1,9 @@
 import chai from 'chai';
-import {waterfallMap} from '../src/waterfall';
+import { waterfallMap } from '../src/waterfall';
 
 describe('waterfall', () => {
   it('should run a series of promises in order', async function() {
-    const array = ['something', 1, {other: 'this'}];
+    const array = ['something', 1, { other: 'this' }];
 
     const arrayIndex: any[] = [];
 

@@ -43,11 +43,12 @@ import {
   VariableDeclarator,
   WhileStatement,
 } from 'shift-ast';
-import {BasicContext} from './context';
-import {InterpreterRuntimeError} from './errors';
-import {Interpreter} from './interpreter';
-import {binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap} from './operators';
-import {toString} from './util';
+import { BasicContext } from './context';
+import { InterpreterRuntimeError } from './errors';
+import { Interpreter } from './interpreter';
+import { binaryOperatorMap, compoundAssignmentOperatorMap, unaryOperatorMap } from './operators';
+import { toString } from './util';
+import { Variable } from 'shift-scope';
 
 export interface DynamicClass {
   [key: string]: any;
@@ -81,14 +82,10 @@ export class NodeHandler {
   }
 
   FunctionDeclaration(decl: FunctionDeclaration) {
-    const variables = this.interpreter.lookupTable.variableMap.get(decl.name);
-
-    if (variables.length > 1) throw new Error('reproduce this and handle it better');
-    const variable = variables[0];
-
     const fn = this.interpreter.createFunction(decl);
 
-    this.interpreter.variableMap.set(variable, fn);
+    const variables = this.interpreter.lookupTable.variableMap.get(decl.name);
+    variables.forEach((variable: Variable) => this.interpreter.variableMap.set(variable, fn));
   }
 
   BlockStatement(stmt: BlockStatement) {
@@ -321,7 +318,7 @@ export class NodeHandler {
 
     while ((result = iterator.next())) {
       if (result.done) break;
-      const {value} = result;
+      const { value } = result;
       switch (stmt.left.type) {
         case 'VariableDeclaration': {
           this.interpreter.declareVariables(stmt.left);
@@ -471,7 +468,7 @@ export class NodeHandler {
 
   ObjectExpression(expr: ObjectExpression) {
     const _debug = debug.extend('ObjectExpression');
-    const obj: {[key: string]: any} = {};
+    const obj: { [key: string]: any } = {};
     const batchOperations: Map<string, Map<string, () => any>> = new Map();
     function getPropertyDescriptors(name: string) {
       if (batchOperations.has(name)) return batchOperations.get(name)!;
@@ -774,6 +771,10 @@ export class NodeHandler {
   ContinueStatement(...args: any) {
     this.interpreter.isContinuing(true);
   }
+  DebuggerStatement(...args: any) {
+    debugger;
+  }
+
   EmptyStatement(...args: any) {}
 
   // TODO support these nodes
@@ -791,9 +792,6 @@ export class NodeHandler {
   }
   ForAwaitStatement(...args: any) {
     throw new InterpreterRuntimeError(`Unsupported node ${arguments[0].type}`);
-  }
-  DebuggerStatement(...args: any) {
-    debugger;
   }
   NewTargetExpression(...args: any) {
     throw new InterpreterRuntimeError(`Unsupported node ${arguments[0].type}`);

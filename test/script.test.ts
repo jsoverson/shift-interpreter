@@ -1,7 +1,7 @@
 import chai from 'chai';
-import {parseScript} from 'shift-parser';
-import {Interpreter} from '../src';
-import {FunctionDeclaration, BindingIdentifier} from 'shift-ast';
+import { parseScript } from 'shift-parser';
+import { Interpreter } from '../src';
+import { FunctionDeclaration, BindingIdentifier } from 'shift-ast';
 
 describe('Script', () => {
   it('should retain access to variables after script execution', () => {

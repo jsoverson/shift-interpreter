@@ -1,4 +1,4 @@
-import {compare, assertResult} from '../util';
+import { compare, assertResult } from '../util';
 
 describe('UpdateExpression', () => {
   it('should evaluate operators the same as the host environment', () => {

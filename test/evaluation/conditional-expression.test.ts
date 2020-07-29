@@ -1,4 +1,4 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('conditional expressions', () => {
   it('should evaluate basic conditional expressions', () => {

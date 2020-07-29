@@ -1,9 +1,9 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('host', () => {
   describe('ffi', () => {
     it('should have access to simple values in the context', () => {
-      assertResult(compare('let b = a; b;', {a: ''}));
+      assertResult(compare('let b = a; b;', { a: '' }));
     });
     it('should have access to complex values in the context', () => {
       class A {
@@ -12,7 +12,7 @@ describe('host', () => {
           this.prop = 222;
         }
       }
-      assertResult(compare('let b = new A(); b.prop;', {A}));
+      assertResult(compare('let b = new A(); b.prop;', { A }));
     });
   });
   describe('literal regexes', () => {

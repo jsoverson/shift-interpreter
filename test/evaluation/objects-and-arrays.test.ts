@@ -1,4 +1,4 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('Objects', () => {
   it('should not interfere with external promises', () => {
@@ -6,7 +6,7 @@ describe('Objects', () => {
     const outer = (global.outer = new Promise(res => {
       res(22);
     }));
-    assertResult(compare('let inner = this.outer; inner', {outer}));
+    assertResult(compare('let inner = this.outer; inner', { outer }));
     //@ts-ignore
     delete global.outer;
   });

@@ -1,7 +1,7 @@
-import {expect} from 'chai';
-import {Expression, LiteralInfinityExpression} from 'shift-ast';
-import {Interpreter} from '../../src/interpreter';
-import {assertResult, compare} from '../util';
+import { expect } from 'chai';
+import { Expression, LiteralInfinityExpression } from 'shift-ast';
+import { Interpreter } from '../../src/interpreter';
+import { assertResult, compare } from '../util';
 
 function evaluate(expr: Expression) {
   const interpreter = new Interpreter();

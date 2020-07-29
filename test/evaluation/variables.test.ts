@@ -1,4 +1,4 @@
-import {assertResult, compare} from '../util';
+import { assertResult, compare } from '../util';
 
 describe('Variables', () => {
   it('should declare and init variables and be able to retrieve the value', () => {
@@ -31,9 +31,8 @@ describe('Variables', () => {
   it('should support const', () => {
     assertResult(compare('const a = 2; a;'));
   });
-  xit('should not allow reassignment to constants', () => {
-    // I'm not sure I care about for this until I find a real world example.
-    assertResult(compare('const a = 3; try { a = 4 } catch {} return a; '));
+  it('should not allow reassignment to constants', () => {
+    assertResult(compare('const a = 3; try { a = 4 } catch(e) {} a; '));
   });
   it('should allow array pattern assignments', () => {
     assertResult(compare('let [a] = [2]; a;'));

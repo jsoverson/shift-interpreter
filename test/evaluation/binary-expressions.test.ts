@@ -1,4 +1,4 @@
-import {compare, assertResult} from '../util';
+import { assertResult, compare } from '../util';
 
 const operators = [
   '==',

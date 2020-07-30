@@ -26,7 +26,7 @@ $ npm install shift-interpreter
 
 ## Usage
 
-Basic usage for quick-start and testing.
+### Basic usage
 
 ```js
 const { interpret } = require('shift-intepreter');
@@ -60,6 +60,8 @@ const result = interpreter.run();
 console.log(result); // 100
 ```
 
+### Passing contexts
+
 By default, a script has access to nothing, its global context is empty. Pass a JavaScript object as the second parameter to `.load()` to use as the global context.
 
 ```js
@@ -79,6 +81,8 @@ const result = interpreter.run(); // ReferenceError: console is not defined
 interpreter.load(tree, { console });
 const result = interpreter.run(); // "hello world!"
 ```
+
+### Selective Execution
 
 The following is an example of selective execution. This program decodes an array of strings while only actually executing one statement in the target source.
 

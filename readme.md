@@ -29,7 +29,7 @@ $ npm install shift-interpreter
 ### Basic usage
 
 ```js
-const { interpret } = require('shift-intepreter');
+const { interpret } = require('shift-interpreter');
 
 const source = `
 const a = 40;
@@ -44,7 +44,7 @@ The above is equivalent to the following:
 
 ```js
 const { parseScript } = require('shift-parser');
-const { Interpreter } = require('shift-intepreter');
+const { Interpreter } = require('shift-interpreter');
 
 const source = `
 const a = 40;
@@ -66,7 +66,7 @@ By default, a script has access to nothing, its global context is empty. Pass a 
 
 ```js
 const { parseScript } = require('shift-parser');
-const { Interpreter } = require('shift-intepreter');
+const { Interpreter } = require('shift-interpreter');
 
 const source = `
 console.log("hello world!");
@@ -88,7 +88,7 @@ The following is an example of selective execution. This program decodes an arra
 
 ```js
 const { parseScript } = require('shift-parser');
-const { Interpreter } = require('shift-intepreter');
+const { Interpreter } = require('shift-interpreter');
 
 const source = `
 const strings = [ "ZG9jdW1lbnQ=", "YWRkRXZlbnRMaXN0ZW5lcg==", "bG9hZA==" ];
@@ -151,7 +151,7 @@ Pass your own handler to override or augment behavior for specific nodes.
 
 #### .load(ast, context = {})
 
-Load an ast as the script this intepreter will analyze for state and execution. Optionally pass a context object to use as the
+Load an ast as the script this interpreter will analyze for state and execution. Optionally pass a context object to use as the
 global context
 
 #### .run(node?)
